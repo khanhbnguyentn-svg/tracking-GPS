@@ -16,7 +16,7 @@ class ProfileRepository(
     suspend fun get(id: Long): Profile? = dao.get(id)?.let(::toProfile)
     suspend fun active(): Profile? = dao.getActive()?.let(::toProfile)
 
-    suspend fun save(profile: ImportedProfile): Long {
+    suspend fun save(profile: ImportedProfile, customCa: ByteArray? = null): Long {
         val id = dao.insert(
             ProfileEntity(
                 name = profile.name,
@@ -26,7 +26,7 @@ class ProfileRepository(
                 tlsMode = profile.tlsMode.name,
             ),
         )
-        secrets.put(id, ProfileSecret(profile.host, profile.certificatePin))
+        secrets.put(id, ProfileSecret(profile.host, profile.certificatePin, customCa))
         return id
     }
 

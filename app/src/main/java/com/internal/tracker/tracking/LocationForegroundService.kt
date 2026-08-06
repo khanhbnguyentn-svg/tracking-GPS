@@ -34,6 +34,7 @@ interface TrackingDependenciesOwner {
     val trackingQueue: QueueStore
     val trackingUploader: QueueUploader
     suspend fun activeTrackingProfile(): Profile?
+    fun rememberLocation(sample: LocationSample)
 }
 
 class LocationForegroundService : Service() {
@@ -54,7 +55,7 @@ class LocationForegroundService : Service() {
                             location.time,
                             location.speed.toDouble(),
                             location.accuracy.toDouble(),
-                        ),
+                        ).also(owner::rememberLocation),
                     )
                     preferences.lastLocationTime = location.time
                     val upload = owner.trackingUploader.drain()
