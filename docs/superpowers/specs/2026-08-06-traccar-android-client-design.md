@@ -99,7 +99,7 @@ App có nút **Tải file cấu hình mẫu** và **Nhập file cấu hình** d�
 
 Device ID được app tự lấy từ `Settings.Secure.ANDROID_ID` và chuẩn hóa thành `AND-<16 ký tự hex>`. Cơ chế này không cần quyền đọc số điện thoại, ổn định trên cùng thiết bị/người dùng/signing key và có thể thay đổi sau factory reset hoặc thay signing key. App hiển thị Device ID với nút sao chép để PIC đối chiếu. Nếu hệ thống không trả về Android ID hợp lệ, app tạo UUID một lần và lưu trong vùng cấu hình mã hóa.
 
-- HTTP chỉ dùng cho mạng nội bộ/VPN và cần cảnh báo rõ trên UI.
+- HTTP chỉ dùng cho mạng nội bộ/VPN và cần cảnh báo rõ trên UI. Vì Android Network Security Config không hỗ trợ whitelist động hostname do người dùng nhập, manifest phải cho phép cleartext ở cấp ứng dụng để hỗ trợ profile HTTP tùy chỉnh. Ứng dụng không có endpoint HTTP nào khác và networking chỉ gửi đến profile active; HTTPS vẫn là chế độ bắt buộc khuyến nghị cho production.
 - System CA dùng trust store mặc định của Android.
 - Custom CA import file chứng chỉ bằng system file picker, lưu trong vùng riêng của app và chỉ áp dụng cho client/profile tương ứng.
 - Certificate pinning nhận pin SHA-256 dạng chuẩn `sha256/...` và chỉ áp dụng cho hostname của profile.
