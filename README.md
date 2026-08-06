@@ -15,7 +15,7 @@ git push -u origin main
 3. Mở tab **Actions** trên GitHub, chọn workflow **Android** và chờ dấu xanh.
 4. Mở lần chạy mới nhất, tải artifact `traccar-tracker-debug`, giải nén và cài `app-debug.apk` lên máy test.
 
-GitHub Actions tự chạy unit test, Android lint và build APK. File debug chỉ dùng nội bộ để thử; phát hành chính thức cần keystore release do IT giữ.
+GitHub Actions tự chạy unit test, Android lint và build APK nội bộ. Dự án không có quy trình phát hành Google Play hoặc phân phối công khai.
 
 ## Build bằng Android Studio
 
