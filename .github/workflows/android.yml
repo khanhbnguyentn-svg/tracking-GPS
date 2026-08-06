@@ -1,13 +1,14 @@
 name: Android
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
