@@ -13,11 +13,13 @@ fun interface LocationSender {
 }
 
 class OsmAndClient(
-    private val client: OkHttpClient,
+    private val clientFor: (Profile) -> OkHttpClient,
     private val requests: OsmAndRequestFactory,
 ) : LocationSender {
+    constructor(client: OkHttpClient, requests: OsmAndRequestFactory) : this({ client }, requests)
+
     override fun send(profile: Profile, deviceId: String, location: PendingLocation): SendResult = try {
-        client.newCall(requests.create(profile, deviceId, location)).execute().use { response ->
+        clientFor(profile).newCall(requests.create(profile, deviceId, location)).execute().use { response ->
             if (response.isSuccessful) SendResult.Success else SendResult.HttpFailure(response.code)
         }
     } catch (_: UnknownHostException) {
