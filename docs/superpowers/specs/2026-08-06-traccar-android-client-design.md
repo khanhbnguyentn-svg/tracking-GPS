@@ -14,7 +14,9 @@ Xây dựng một ứng dụng Android nội bộ bằng Kotlin để 100–350 
 ### Ứng dụng Android
 
 - Cấu hình nhiều profile server ngay trên điện thoại.
-- Cấu hình host/IP, port, HTTP/HTTPS, Device ID, chu kỳ gửi và chế độ chứng chỉ.
+- Cấu hình host/IP, port, HTTP/HTTPS, chu kỳ gửi và chế độ chứng chỉ.
+- Xuất file JSON mẫu và nhập file JSON dùng chung để cấu hình nhanh nhiều điện thoại.
+- Tự tạo Device ID ổn định trên từng điện thoại; người dùng không phải nhập thủ công.
 - Hướng dẫn cấp quyền vị trí, vị trí nền, thông báo và loại trừ tối ưu pin.
 - Lấy vị trí bằng Fused Location Provider trong foreground service loại `location`.
 - Lưu từng vị trí vào Room trước khi gửi.
@@ -75,16 +77,34 @@ Request OsmAnd có dạng:
 
 Các tham số được mã hóa bằng URL builder của OkHttp. Không log URL hoàn chỉnh, Device ID hoặc dữ liệu vị trí trong release build.
 
-## 6. Profile và bảo mật kết nối
+## 6. Profile, file cấu hình và bảo mật kết nối
 
-Mỗi profile có tên, host/IP, port, scheme, Device ID, chu kỳ gửi và TLS mode. Chỉ một profile active tại một thời điểm. Không cho đổi profile active trong lúc tracking; người dùng phải dừng tracking trước.
+Mỗi profile có tên, host/IP, port, scheme, chu kỳ gửi và TLS mode. Chỉ một profile active tại một thời điểm. Không cho đổi profile active trong lúc tracking; người dùng phải dừng tracking trước.
+
+App có nút **Tải file cấu hình mẫu** và **Nhập file cấu hình** dùng Android system file picker. File dùng JSON có trường `version` để kiểm soát tương thích, không dùng text tự do. Một file có thể dùng chung cho toàn bộ điện thoại và không chứa Device ID. Khi import, app validate toàn bộ dữ liệu, hiển thị bản xem trước rồi mới cho lưu; không tự ghi đè profile hiện tại. Custom CA `.crt` được import riêng, không nhúng vào JSON.
+
+```json
+{
+  "version": 1,
+  "name": "Production",
+  "host": "traccar.internal.company.com",
+  "port": 443,
+  "scheme": "https",
+  "intervalSeconds": 60,
+  "tlsMode": "system"
+}
+```
+
+`tlsMode` nhận `system`, `customCa` hoặc `pinning`. Với `pinning`, file có thêm `certificatePin`; với `customCa`, người dùng phải chọn file `.crt` sau khi import. Các trường lạ hoặc version chưa hỗ trợ bị từ chối để tránh áp dụng nhầm cấu hình.
+
+Device ID được app tự lấy từ `Settings.Secure.ANDROID_ID` và chuẩn hóa thành `AND-<16 ký tự hex>`. Cơ chế này không cần quyền đọc số điện thoại, ổn định trên cùng thiết bị/người dùng/signing key và có thể thay đổi sau factory reset hoặc thay signing key. App hiển thị Device ID với nút sao chép để PIC đối chiếu. Nếu hệ thống không trả về Android ID hợp lệ, app tạo UUID một lần và lưu trong vùng cấu hình mã hóa.
 
 - HTTP chỉ dùng cho mạng nội bộ/VPN và cần cảnh báo rõ trên UI.
 - System CA dùng trust store mặc định của Android.
 - Custom CA import file chứng chỉ bằng system file picker, lưu trong vùng riêng của app và chỉ áp dụng cho client/profile tương ứng.
 - Certificate pinning nhận pin SHA-256 dạng chuẩn `sha256/...` và chỉ áp dụng cho hostname của profile.
 
-Không triển khai hostname verifier hoặc trust manager bỏ qua xác minh. Profile phải validate host, port, Device ID, interval và certificate input trước khi lưu.
+Không triển khai hostname verifier hoặc trust manager bỏ qua xác minh. App phải validate host, port, interval, certificate input và Device ID tự sinh trước khi lưu profile.
 
 ## 7. Chẩn đoán kết nối
 
@@ -98,6 +118,8 @@ Kết quả phân biệt DNS, connection refused, timeout, TLS/certificate, HTTP
 ## 8. Cảnh báo server cho 100–350 thiết bị
 
 Mỗi điện thoại có Device ID duy nhất và được liên kết với nhóm/PIC trong Traccar. IT bật tạo status event và cấu hình notification theo nhóm.
+
+Để không phải tạo thủ công 100–350 Device ID, IT bật `database.registerUnknown` với `database.registerUnknown.regex` chỉ nhận mẫu `^AND-[0-9a-f]{16}$` và `database.registerUnknown.defaultGroupId` trỏ đến nhóm **Chờ xác nhận**. PIC đối chiếu Device ID hiển thị trên điện thoại, đổi tên thiết bị, gán nhóm vận hành và PIC trước khi bật cảnh báo. Auto-register chỉ là hỗ trợ onboarding, không xác thực danh tính; endpoint vẫn phải giới hạn trong mạng nội bộ/VPN và nhóm chờ xác nhận không được tham gia cảnh báo vận hành.
 
 - Không có dữ liệu mới trong 5 phút: cảnh báo **Mất kết nối**.
 - Sau 10 phút: nhắc lại hoặc escalate đến danh sách liên hệ tiếp theo.
@@ -114,7 +136,7 @@ Tạm ngừng cảnh báo yêu cầu thiết bị, thời điểm bắt đầu/k
 Ứng dụng có ba destination chính:
 
 - **Trạng thái:** công tắc bắt đầu/dừng, profile active, GPS cuối, gửi cuối và queue count.
-- **Cấu hình:** danh sách profile và form chỉnh sửa đầy đủ.
+- **Cấu hình:** danh sách profile, form chỉnh sửa, tải file mẫu và nhập file JSON.
 - **Chẩn đoán:** hai bước kiểm tra, kết quả cụ thể và thao tác mở Settings khi cần.
 
 Các nút dùng icon quen thuộc kèm nhãn rõ ràng. Trạng thái lỗi không chỉ dựa vào màu. Nội dung dài phải co giãn trên màn hình nhỏ và hỗ trợ font scaling.
@@ -136,6 +158,8 @@ Unit test tập trung vào:
 - FIFO, giới hạn 10.000 điểm và chỉ xóa sau thành công.
 - Phân loại kết quả Test Connection.
 - Validate profile và certificate pin.
+- Parse, validate và round-trip file cấu hình JSON.
+- Tạo Device ID đúng định dạng và dùng fallback khi Android ID không hợp lệ.
 - Retry/backoff ở mức worker/repository.
 
 GitHub Actions chạy Gradle unit tests, lint và build debug APK trên mỗi pull request/push. APK debug được upload làm workflow artifact.
