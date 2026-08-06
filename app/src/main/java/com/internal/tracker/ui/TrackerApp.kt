@@ -2,6 +2,8 @@ package com.internal.tracker.ui
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -60,6 +62,7 @@ import com.internal.tracker.config.ImportedProfile
 import com.internal.tracker.config.Scheme
 import com.internal.tracker.config.TlsMode
 import com.internal.tracker.network.DiagnosticResult
+import com.internal.tracker.network.TlsClientFactory
 import com.internal.tracker.profile.Profile
 import com.internal.tracker.tracking.PermissionAction
 import com.internal.tracker.tracking.PermissionPolicy
@@ -119,6 +122,13 @@ private fun StatusScreen(container: AppContainer, modifier: Modifier) {
         StatusRow("Trạng thái", if (tracking) "Đang theo dõi" else "Đã dừng")
         StatusRow("Profile", active?.name ?: "Chưa chọn")
         StatusRow("Device ID", container.deviceId.get())
+        OutlinedButton(
+            onClick = {
+                context.getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText("Device ID", container.deviceId.get()))
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Sao chép Device ID") }
         StatusRow("Điểm chờ gửi", queued.toString())
         StatusRow("GPS cuối", formatTime(container.trackingPreferences.lastLocationTime))
         StatusRow("Gửi cuối", formatTime(container.trackingPreferences.lastSendTime))
@@ -204,7 +214,10 @@ private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
             onClick = {
                 val json = buildConfigJson(name, host, port, scheme, interval, tlsMode, pin)
                 container.configCodec.decode(json).onSuccess { profile ->
-                    if (profile.tlsMode == TlsMode.CUSTOM_CA && customCa == null) error = "Hãy chọn file .crt" else scope.launch {
+                    val caError = if (profile.tlsMode == TlsMode.CUSTOM_CA) runCatching {
+                        TlsClientFactory().customCa(requireNotNull(customCa))
+                    }.exceptionOrNull() else null
+                    if (caError != null) error = "File chứng chỉ X.509 không hợp lệ" else scope.launch {
                         val id = container.profiles.save(profile, customCa)
                         if (profiles.none { it.active }) container.profiles.activate(id)
                         error = null

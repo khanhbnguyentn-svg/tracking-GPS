@@ -1,85 +1,82 @@
-# Tài liệu kỹ thuật: Setup Traccar Server nội bộ
-**Mục đích:** Gửi phòng IT làm căn cứ triển khai server tiếp nhận dữ liệu vị trí từ app Android nội bộ.
-**Nguồn tham khảo:** https://github.com/traccar/traccar (Apache-2.0, Java)
+# Bàn giao IT: Traccar Server nội bộ
 
----
+Phạm vi: tiếp nhận vị trí từ 100–350 điện thoại Android qua giao thức OsmAnd. App tự tạo Device ID dạng `AND-<16 ký tự hex>`; không tạo file cấu hình riêng cho từng máy.
 
-## 1. Tổng quan yêu cầu
+## 1. Kiến trúc khuyến nghị
 
-Cần triển khai **Traccar Server** trên hạ tầng nội bộ để tiếp nhận vị trí GPS định kỳ từ app Android do bộ phận [tên bộ phận] phát triển. App sẽ gửi dữ liệu qua giao thức **OsmAnd HTTP protocol** — một trong các protocol listener có sẵn của Traccar, dùng HTTP GET/POST đơn giản.
+- Traccar Server `traccar/traccar:6.13.3` (ghim phiên bản, không dùng `latest` trong production).
+- PostgreSQL được backup hằng ngày; không dùng H2 cho production.
+- Reverse proxy HTTPS ở trước cổng OsmAnd `5055` và Web/API `8082`.
+- Chỉ cho phép Web/API quản trị từ VLAN/VPN quản trị. Endpoint nhận GPS chỉ mở cho mạng/VPN điện thoại cần dùng.
+- Tối thiểu 2 vCPU, 4 GB RAM, 20 GB SSD; theo dõi CPU, RAM, dung lượng DB và thời gian ghi. 350 máy gửi mỗi 30 giây tương đương khoảng 12 bản tin/giây, chưa tính retry.
 
-## 2. Yêu cầu hạ tầng
+Nâng phiên bản Traccar phải thử ở staging và backup DB trước. Tham chiếu bản phát hành: https://github.com/traccar/traccar/releases
 
-| Hạng mục | Yêu cầu tối thiểu | Ghi chú |
-|---|---|---|
-| OS | Linux (khuyến nghị) hoặc Windows Server | Có thể chạy bằng Docker image chính thức |
-| RAM | 2 GB (dev/test) — 4 GB+ (production, nhiều thiết bị) | |
-| CPU | 2 core | |
-| Ổ đĩa | 20 GB+, tăng theo số lượng thiết bị và tần suất gửi vị trí | Dữ liệu vị trí tích lũy theo thời gian |
-| Database | PostgreSQL (khuyến nghị cho production) | Traccar mặc định dùng H2 (file-based) — **không khuyến nghị cho production** vì không phù hợp nhiều kết nối đồng thời |
-| Java Runtime | JRE 17+ (nếu không chạy Docker) | Traccar là ứng dụng Java |
+## 2. Hợp đồng kết nối app
 
-## 3. Phương án triển khai (khuyến nghị: Docker)
+App gửi đến:
 
-```bash
-docker run -d \
-  --name traccar \
-  -p 8082:8082 \
-  -p 5055:5055 \
-  -v /opt/traccar/data:/opt/traccar/data \
-  -v /opt/traccar/logs:/opt/traccar/logs \
-  traccar/traccar:latest
+```text
+https://tracker.company.internal:5055/?id=AND-0123456789ABCDEF&lat=10.1&lon=106.1&timestamp=...&speed=...
 ```
 
-- **Port 8082**: Web UI + REST API quản trị.
-- **Port 5055**: OsmAnd protocol listener — **đây là port app Android sẽ kết nối tới**.
+- `id`: tự sinh trên điện thoại, PIC xác nhận trên server.
+- `speed`: knot theo OsmAnd/Traccar.
+- App xếp hàng cục bộ khi mất mạng và gửi lại sau; WorkManager chỉ retry hàng đợi, không tự khởi động foreground service.
+- File dùng chung: `config/traccar-profile.example.json`. IT thay host/port/TLS rồi phát cùng một file cho mọi điện thoại.
+- Ưu tiên `https` + chứng chỉ CA hệ thống. Nếu dùng CA nội bộ, cung cấp file chứng chỉ cho người cài app. Chỉ dùng `http` trong mạng/VPN tin cậy và coi là tạm thời.
 
-> IT cần xác nhận port 5055 (hoặc port tùy chỉnh nếu đổi) được mở trong firewall nội bộ, chỉ cho phép truy cập từ dải mạng nội bộ/VPN công ty, **không public ra Internet**.
+## 3. Tự đăng ký và vùng cách ly
 
-## 4. Yêu cầu bảo mật — QUAN TRỌNG
+Tạo trước group `Chờ PIC xác nhận`, lấy ID của group, rồi thêm vào `traccar.xml`:
 
-Vì dữ liệu là vị trí thời gian thực của nhân viên (dữ liệu nhạy cảm), đề xuất theo thứ tự ưu tiên:
-
-### Ưu tiên 1 (khuyến nghị chính): HTTPS qua reverse proxy
-- Đặt **Nginx** (hoặc reverse proxy tương đương) phía trước Traccar.
-- Cấp **chứng chỉ TLS nội bộ** (từ CA nội bộ công ty nếu có, hoặc self-signed + cài certificate vào app).
-- Forward: `https://traccar.internal.company.com:XXXX` → `http://traccar-server:5055`.
-- App sẽ luôn gọi qua HTTPS, không gọi trực tiếp HTTP vào port 5055.
-
-### Ưu tiên 2 (fallback tạm thời nếu chưa kịp cấp TLS)
-- Giới hạn truy cập port 5055 **chỉ trong mạng nội bộ / bắt buộc qua VPN công ty**, không mở ra ngoài dưới bất kỳ hình thức nào.
-- Đây chỉ nên là giải pháp tạm thời, cần có lộ trình chuyển sang HTTPS.
-
-### Khuyến nghị bổ sung
-- Theo dõi log truy cập bất thường vào port 5055/8082.
-- Đổi mật khẩu admin mặc định ngay sau khi cài đặt Web UI.
-- Backup định kỳ database Traccar.
-
-## 5. Cấu hình Device (do bộ phận nghiệp vụ quản lý, IT chỉ cần biết luồng)
-
-Mỗi thiết bị/nhân viên cần được tạo trong Traccar với một `uniqueId` (Device ID) — đây là giá trị app Android sẽ dùng khi gửi vị trí. Việc tạo device thực hiện qua Web UI (`http://<server>:8082`) hoặc REST API, **không thuộc phạm vi setup hạ tầng của IT**, nhưng IT cần đảm bảo Web UI truy cập được cho người quản trị (ví dụ HR/AI Crew) để tạo/quản lý device.
-
-## 6. Endpoint app sẽ gọi (để IT xác nhận đã sẵn sàng)
-
-Sau khi setup xong, endpoint app Android sẽ gọi có dạng:
-
-```
-https://<domain-noi-bo>:<port>/?id=<device_id>&lat=<lat>&lon=<lon>&timestamp=<unix_time>&speed=<speed>
+```xml
+<entry key='database.registerUnknown'>true</entry>
+<entry key='database.registerUnknown.regex'>^AND-[0-9A-F]{16}$</entry>
+<entry key='database.registerUnknown.defaultGroupId'>ID_GROUP_CHO_XAC_NHAN</entry>
+<entry key='database.registerUnknown.defaultCategory'>mobile</entry>
 ```
 
-IT cần xác nhận:
-- [ ] Domain/IP nội bộ đã cấu hình DNS (nếu dùng domain) và có thể resolve từ mạng nhân viên (Wi-Fi văn phòng / VPN).
-- [ ] Port đã mở đúng, test được bằng `curl` hoặc Postman từ máy trong mạng nội bộ.
-- [ ] HTTPS hoạt động, chứng chỉ hợp lệ (không bị cảnh báo self-signed nếu dùng CA nội bộ đã cài vào máy/app).
-- [ ] Đã tạo được ít nhất 1 device test trên Web UI để phía dev test kết nối từ app.
+Quy trình PIC:
 
-## 7. Câu hỏi cần IT xác nhận trước khi dev bắt đầu tích hợp
+1. Đối chiếu Device ID hiển thị trên điện thoại với thiết bị mới trong group chờ.
+2. Đổi tên thành tên nghiệp vụ, gán group hoạt động và PIC phụ trách.
+3. Thiết bị không xác định phải bị disable/xóa và kiểm tra log nguồn gửi.
 
-1. Server sẽ có domain nội bộ hay chỉ dùng IP tĩnh?
-2. Có sẵn CA nội bộ để cấp chứng chỉ TLS không, hay cần dùng self-signed?
-3. Nhân viên truy cập server này qua Wi-Fi văn phòng, VPN, hay cả hai? (ảnh hưởng tới việc app hoạt động khi nhân viên ở ngoài văn phòng)
-4. Database dự kiến dùng là gì (PostgreSQL có sẵn hay cần IT cấp mới)?
-5. Ai sẽ là người vận hành/patch Traccar server định kỳ về sau?
+## 4. Cảnh báo gián đoạn
 
----
-*Tài liệu này mô tả yêu cầu kỹ thuật để IT triển khai server; phần phát triển app Android và cấu hình device/nghiệp vụ được thực hiện bởi đội dự án.*
+Dùng notification loại **Device Inactive**, không dựa riêng vào trạng thái offline của kết nối HTTP. Gán các attribute ở group hoạt động:
+
+```text
+deviceInactivityStart = 300000
+deviceInactivityPeriod = 300000
+```
+
+Đơn vị là mili giây: cảnh báo đầu sau 5 phút không có vị trí, lặp lại mỗi 5 phút. Như vậy mốc 10 phút là lần cảnh báo thứ hai để PIC escalation. Tạo thêm notification phục hồi/online nếu phiên bản và kênh thông báo đang dùng hỗ trợ; nếu không, PIC đóng sự cố khi `last update` mới xuất hiện.
+
+Mỗi cảnh báo phải có Device ID, tên thiết bị, thời điểm vị trí cuối, tuổi dữ liệu và link vào Traccar. Gửi ít nhất qua web + email/Teams/Slack webhook do IT quản lý. Thử notification sau mỗi thay đổi cấu hình.
+
+Lưu ý: đây là cảnh báo mất dữ liệu, không tự kết luận tai nạn. PIC phải gọi xác minh theo quy trình an toàn nội bộ.
+
+## 5. Tạm tắt cảnh báo có thời hạn
+
+Traccar không có nút snooze có thời hạn theo từng thiết bị. Không disable thiết bị vì sẽ bỏ cả dữ liệu GPS. IT triển khai quy trình tối thiểu sau:
+
+1. PIC ghi Device ID, lý do, người duyệt và thời điểm tự bật lại trong ticket/lịch trực.
+2. IT tạm unlink notification `deviceInactive` khỏi thiết bị (API permission) hoặc chuyển thiết bị sang group `Tạm ngừng cảnh báo` không gắn notification.
+3. Job định kỳ 5 phút đọc danh sách hết hạn và tự link lại notification/chuyển về group cũ; mọi thao tác có audit log.
+
+Nếu chưa có automation, ticket bắt buộc có lịch nhắc và hai người kiểm tra khi bật lại. Đây là yêu cầu vận hành, không được coi là tính năng native của Traccar.
+
+## 6. Kiểm tra nghiệm thu
+
+- [ ] DNS và HTTPS truy cập được từ Wi-Fi/VPN của điện thoại; chứng chỉ không báo lỗi.
+- [ ] Cổng `5055` không public ngoài phạm vi đã duyệt; Web/API `8082` chỉ dành cho quản trị.
+- [ ] Gửi một Device ID hợp lệ sẽ tự tạo đúng group chờ; ID sai regex không được tạo.
+- [ ] PIC xác nhận, đổi tên và chuyển thiết bị sang group hoạt động.
+- [ ] Tắt mạng máy test: cảnh báo ở phút 5 và lặp/escalate ở phút 10.
+- [ ] Bật mạng: dữ liệu hàng đợi được nhận, PIC thấy cập nhật mới và đóng cảnh báo.
+- [ ] Tạm ngừng cảnh báo hết hạn sẽ tự bật lại.
+- [ ] Backup PostgreSQL đã được restore thử; log/DB có cảnh báo dung lượng.
+
+Tham chiếu chính thức: https://www.traccar.org/configuration-file, https://www.traccar.org/events/, https://www.traccar.org/api-reference
