@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Theo dõi nội bộ</string>
+    <string name="setup_pending">Chưa có cấu hình kết nối</string>
+</resources>

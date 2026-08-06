@@ -1,2 +1,7 @@
 /~/
 /.worktrees/
+/.tools/
+/.gradle/
+/local.properties
+/**/build/
+/.idea/

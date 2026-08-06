@@ -6,7 +6,7 @@
 
 **Architecture:** One `app` module uses Compose and ViewModels for UI, Room for profiles and pending positions, an encrypted preferences file for sensitive profile fields, OkHttp for OsmAnd/TLS, a location foreground service for collection, and WorkManager for retry uploads. Manual dependency wiring in `TrackerApplication` avoids a DI framework; pure Kotlin policy and codec classes carry most unit-testable behavior.
 
-**Tech Stack:** Kotlin, Android SDK 34–36, AGP 9.2, Gradle 9.4.1, JDK 17, Jetpack Compose BOM 2026.06.00, Room, WorkManager, Google Play Services Location, OkHttp, AndroidX Security Crypto, JUnit 4.
+**Tech Stack:** Kotlin, Android SDK 34–36, AGP 8.13, Gradle 8.13, JDK 17, Jetpack Compose BOM 2026.06.00, Room, WorkManager, Google Play Services Location, OkHttp, AndroidX Security Crypto, JUnit 4.
 
 ## Global Constraints
 
@@ -50,7 +50,7 @@
 **Interfaces:**
 - Produces: Android application id `com.internal.tracker`, `TrackerApplication`, and a Compose `TrackerApp()` entry point.
 
-- [ ] **Step 1: Write the failing configuration test**
+- [x] **Step 1: Write the failing configuration test**
 
 ```kotlin
 class ProjectConfigTest {
@@ -60,15 +60,15 @@ class ProjectConfigTest {
 }
 ```
 
-- [ ] **Step 2: Run `./gradlew testDebugUnitTest` and verify it fails because no Android project exists.**
+- [x] **Step 2: Run `./gradlew testDebugUnitTest` and verify it fails because no Android project exists.**
 
-- [ ] **Step 3: Add the minimal Gradle/Compose project** using AGP `9.2`, Gradle `9.4.1`, JDK 17, SDK 34/36, Room, WorkManager, Play Services Location, OkHttp, Security Crypto, Navigation Compose, Lifecycle Compose, and JUnit. Set `android:usesCleartextTraffic="true"` because runtime hostnames cannot be listed statically; the app must expose no network destination except the validated active profile.
+- [x] **Step 3: Add the minimal Gradle/Compose project** using AGP `8.13`, Gradle `8.13`, JDK 17, SDK 34/36, Room, WorkManager, Play Services Location, OkHttp, Security Crypto, Navigation Compose, Lifecycle Compose, and JUnit. Set `android:usesCleartextTraffic="true"` because runtime hostnames cannot be listed statically; the app must expose no network destination except the validated active profile.
 
-- [ ] **Step 4: Add CI** that runs `./gradlew testDebugUnitTest lintDebug assembleDebug` and uploads `app/build/outputs/apk/debug/app-debug.apk` as `traccar-tracker-debug`.
+- [x] **Step 4: Add CI** that runs `./gradlew testDebugUnitTest lintDebug assembleDebug` and uploads `app/build/outputs/apk/debug/app-debug.apk` as `traccar-tracker-debug`.
 
-- [ ] **Step 5: Run `./gradlew testDebugUnitTest lintDebug assembleDebug` and verify all three tasks pass.**
+- [x] **Step 5: Run `./gradlew testDebugUnitTest lintDebug assembleDebug` and verify all three tasks pass.**
 
-- [ ] **Step 6: Commit** with `git commit -m "build: scaffold Android tracker app"`.
+- [x] **Step 6: Commit** with `git commit -m "build: scaffold Android tracker app"`.
 
 ### Task 2: Device identity and shared JSON configuration
 
