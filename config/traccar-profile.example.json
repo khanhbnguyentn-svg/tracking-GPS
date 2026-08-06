@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "name": "Production",
+  "host": "traccar.internal.company.com",
+  "port": 443,
+  "scheme": "https",
+  "intervalSeconds": 60,
+  "tlsMode": "system"
+}
