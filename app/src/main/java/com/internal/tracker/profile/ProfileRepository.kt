@@ -14,6 +14,7 @@ class ProfileRepository(
     fun observeAll(): Flow<List<Profile>> = dao.observeAll().map { rows -> rows.mapNotNull(::toProfile) }
 
     suspend fun get(id: Long): Profile? = dao.get(id)?.let(::toProfile)
+    suspend fun active(): Profile? = dao.getActive()?.let(::toProfile)
 
     suspend fun save(profile: ImportedProfile): Long {
         val id = dao.insert(

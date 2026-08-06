@@ -57,6 +57,7 @@ private class FakeProfileDao : ProfileDao {
 
     override fun observeAll(): Flow<List<ProfileEntity>> = flow
     override suspend fun get(id: Long): ProfileEntity? = rows[id]
+    override suspend fun getActive(): ProfileEntity? = rows.values.firstOrNull { it.active }
     override suspend fun insert(profile: ProfileEntity): Long = nextId++.also { rows[it] = profile.copy(id = it); emit() }
     override suspend fun deactivateAll() { rows.replaceAll { _, value -> value.copy(active = false) }; emit() }
     override suspend fun setActive(id: Long) { rows[id]?.let { rows[id] = it.copy(active = true) }; emit() }
