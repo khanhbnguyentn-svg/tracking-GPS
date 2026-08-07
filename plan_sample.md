@@ -1,8 +1,9 @@
 # Checkpoint triển khai hệ thống quản lý xe
 
-**Thời điểm lưu:** 2026-08-07  
-**Workspace:** `D:\Server\tracking-GPS-main`  
-**Trạng thái:** Tạm dừng triển khai để chờ URL GitHub và đồng bộ mã nguồn.
+**Thời điểm cập nhật:** 2026-08-08  
+**Workspace chính:** `D:\app android`  
+**Worktree đang phát triển:** `D:\app android\.worktrees\fleet-foundation`  
+**Nhánh:** `feature/fleet-foundation`
 
 ## 1. Phạm vi đã thống nhất
 
@@ -34,6 +35,11 @@
 
 ### Đã hoàn thành
 
+0. Kiểm tra lại máy sau thay đổi:
+   - Node.js `24.19.0`, npm `11.17.0`, Git `2.45.1` đã có.
+   - Windows PowerShell `5.1` đã có; PowerShell 7 và Podman chưa cài vì chưa cần cho giai đoạn hiện tại.
+   - Dependency được khôi phục bằng `npm.cmd ci`: audit 0 lỗ hổng.
+
 1. Hoàn thành thiết kế tổng thể và chia thành bốn kế hoạch triển khai tuần tự.
 2. Hoàn thành Task 1 của giai đoạn nền tảng:
    - Tạo `gps-receiver/src/core/config.js`.
@@ -61,24 +67,30 @@
    - Node.js `24.19.0` tại `server/runtime/node-v24.19.0`.
    - PostgreSQL `17.10` + PostGIS `3.6.2` trong cụm thử nghiệm `server/runtime/pg-postgis-test`.
    - Gói PostGIS có MD5 chính thức khớp: `FACA768CC580C4AB2EEF621BE05B408E`.
+6. Hoàn thành Task 2 trên PostgreSQL/PostGIS thật:
+   - PostgreSQL `17.10` + PostGIS `3.6.2` portable chạy loopback `127.0.0.1:55432`.
+   - Migration chạy hai lần idempotent; có 4 dòng `schema_migrations` và partition `2026_08`, `2026_09`.
+7. Hoàn thành Task 3:
+   - Repository transaction lưu vị trí PostGIS, tự tạo Device ID, phân giải assignment, chống trùng và rollback.
+8. Hoàn thành Task 4:
+   - GET OsmAnd và POST JSON chỉ trả accepted sau khi PostgreSQL commit.
+   - Dashboard compatibility đọc PostgreSQL; smoke-test HTTP cổng `15055` đã lưu đúng tọa độ.
+9. Hoàn thành Task 5:
+   - Import JSONL streaming, không xóa nguồn, loại đúng ba smoke ID, idempotent.
+   - CLI bắt buộc `--source`, mặc định dry-run; chỉ ghi khi có `--apply`.
+10. Task 6 đã hoàn thành phần lõi:
+   - Argon2id policy, token 32 byte, chỉ lưu SHA-256, idle 8 giờ, absolute 24 giờ và RBAC.
+   - Bộ test hiện tại: 54/54 đạt khi có database integration test.
 6. Đã bổ sung `.gitignore` để loại trừ `.npm-cache`, `node_modules`, runtime GPS, `.env`, log và tệp tạm.
 
 ### Đang làm dở
 
-- Task 2: kiểm thử migration trên PostgreSQL/PostGIS thực tế.
-- Cụm thử nghiệm đã từng khởi động thành công trên `127.0.0.1:55432` và PostgreSQL báo sẵn sàng nhận kết nối.
-- Database thử nghiệm `fleet_migration_test` đã được tạo.
-- Lệnh chạy migration thực tế bị ngắt khi người dùng yêu cầu chuyển sang đồng bộ GitHub; chưa được phép kết luận migration SQL đạt.
-- Tại thời điểm ghi checkpoint:
-  - PostgreSQL thử nghiệm trên cổng `55432`: không chạy.
-  - Website/API trên cổng `5055`: không chạy.
+- Task 6: còn login/logout HTTP, cookie `fleet_session`, CSRF middleware, trang đăng nhập song ngữ và CLI tạo user.
+- PostgreSQL test sẽ được dừng khi kết thúc phiên; runtime/cache đều bị Git ignore và có thể khởi động lại.
 
 ### Chưa thực hiện
 
-- Task 3: repository ghi vị trí PostgreSQL idempotent.
-- Task 4: service tracking và bảo toàn hợp đồng HTTP hiện tại.
-- Task 5: import JSONL có loại trừ ba thiết bị smoke-test.
-- Task 6: Argon2id, session, CSRF và RBAC.
+- Phần còn lại của Task 6: HTTP login/CSRF và CLI bootstrap user.
 - Task 7: cài database/service Windows production.
 - Task 8: composition, diễn tập cutover và kiểm thử giai đoạn 1.
 - Toàn bộ giai đoạn 2, 3 và 4.
