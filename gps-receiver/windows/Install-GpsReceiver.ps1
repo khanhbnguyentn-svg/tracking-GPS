@@ -37,6 +37,8 @@ $wrapper = Join-Path $InstallRoot 'InternalGpsReceiver.exe'
 $config = Join-Path $InstallRoot 'InternalGpsReceiver.xml'
 $dataDir = Join-Path $DataRoot 'data'
 $logDir = Join-Path $DataRoot 'logs'
+$environmentFile = Join-Path $DataRoot 'config\receiver.env'
+if (-not (Test-Path -LiteralPath $environmentFile)) { throw 'Run Install-FleetDatabase.ps1 before installing the receiver service.' }
 $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($service -and $service.Status -ne 'Stopped') {
     & $wrapper stop
@@ -61,13 +63,25 @@ $appTarget = Join-Path $InstallRoot 'app'
 if (Test-Path -LiteralPath $appTarget) { Remove-Item -LiteralPath $appTarget -Recurse -Force }
 New-Item -ItemType Directory -Path $appTarget | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\src') -Destination $appTarget -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\scripts') -Destination $appTarget -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\package.json') -Destination $appTarget -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\package-lock.json') -Destination $appTarget -Force
 Copy-Item -LiteralPath $WinSWPath -Destination $wrapper -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-GpsReceiver.ps1') -Destination $InstallRoot -Force
 
 $xml = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'InternalGpsReceiver.xml.template')
 $xml = $xml.Replace('@@DATA_DIR@@', [Security.SecurityElement]::Escape($dataDir))
 $xml = $xml.Replace('@@LOG_DIR@@', [Security.SecurityElement]::Escape($logDir))
+$xml = $xml.Replace('@@ENV_FILE@@', [Security.SecurityElement]::Escape($environmentFile))
 [IO.File]::WriteAllText($config, $xml, (New-Object Text.UTF8Encoding($false)))
+
+Push-Location $appTarget
+try {
+    & (Join-Path $nodeTarget 'npm.cmd') ci --omit=dev --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE." }
+} finally { Pop-Location }
+& (Join-Path $InstallRoot 'Start-GpsReceiver.ps1') -Migrate
+if ($LASTEXITCODE -ne 0) { throw "Database migration failed with exit code $LASTEXITCODE." }
 
 if (-not $service) {
     & $wrapper install

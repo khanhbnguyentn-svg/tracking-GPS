@@ -82,16 +82,19 @@
     - Argon2id policy, token 32 byte, chỉ lưu SHA-256, idle 8 giờ, absolute 24 giờ và RBAC.
     - Login/logout HTTP, cookie an toàn, CSRF, trang đăng nhập Việt/Anh và CLI tạo/cập nhật user.
     - Bộ test hiện tại: 56/56 đạt khi có database integration test.
+11. Task 7 đã hoàn thành phần mã nguồn và kiểm thử an toàn:
+    - Installer PostgreSQL/PostGIS, DPAPI, ACL, file môi trường ngoài repository và migration trước khi chạy service.
+    - Tài liệu cài đặt, import, cutover và rollback dành cho IT.
+    - Pester: 8/8 đạt; chưa chạy cài đặt production vì cần phiên Administrator trên máy server đích.
 6. Đã bổ sung `.gitignore` để loại trừ `.npm-cache`, `node_modules`, runtime GPS, `.env`, log và tệp tạm.
 
 ### Đang làm dở
 
-- Task 7: cài database/service Windows production và bảo vệ file cấu hình.
+- Task 8: composition, diễn tập cutover và kiểm thử chấp nhận giai đoạn 1.
 - PostgreSQL test sẽ được dừng khi kết thúc phiên; runtime/cache đều bị Git ignore và có thể khởi động lại.
 
 ### Chưa thực hiện
 
-- Task 7: cài database/service Windows production.
 - Task 8: composition, diễn tập cutover và kiểm thử giai đoạn 1.
 - Toàn bộ giai đoạn 2, 3 và 4.
 
