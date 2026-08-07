@@ -41,4 +41,4 @@ function dedupeKey(location) {
     .digest('hex');
 }
 
-module.exports = { createIngestionService };
+module.exports = { createIngestionService, dedupeKey };
