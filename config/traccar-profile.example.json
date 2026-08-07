@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "name": "Production",
-  "host": "traccar.internal.company.com",
-  "port": 443,
-  "scheme": "https",
+  "name": "GPS Receiver LAN",
+  "host": "192.168.80.146",
+  "port": 5055,
+  "scheme": "http",
   "intervalSeconds": 60,
   "tlsMode": "system"
 }

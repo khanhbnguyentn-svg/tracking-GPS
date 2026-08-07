@@ -43,3 +43,9 @@ Không tắt tối ưu pin nếu chính sách công ty không cho phép. Nếu h
 
 Tài liệu IT: `Huong-dan-ky-thuat-setup-Traccar-Server-noi-bo.md`  
 Checklist máy thật: `docs/android-14-device-test-checklist.md`
+
+## Web nhận GPS nội bộ
+
+Thư mục `gps-receiver/` chứa web Node.js nhận trực tiếp contract OsmAnd hiện tại và JSON POST trên cổng `5055`. Sau khi cài Windows Service, mở dashboard tại `http://localhost:5055/dashboard`; điện thoại trong cùng Wi-Fi dùng profile mẫu trong `config/traccar-profile.example.json`.
+
+Web này là môi trường LAN độc lập, không phải Traccar và không được mở port-forward ra Internet. Xem `gps-receiver/README.md` để cài đặt, kiểm thử và vận hành.
