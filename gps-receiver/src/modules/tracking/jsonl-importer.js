@@ -34,7 +34,7 @@ async function importJsonl({ paths, repository, excludedDeviceIds = new Set(), d
           ...normalized.value,
           deviceTime: new Date(normalized.value.deviceTime),
           receivedAt,
-          source: 'jsonl-import',
+          source: 'legacy-jsonl',
           dedupeKey: dedupeKey(normalized.value),
         });
         summary[result.duplicate ? 'duplicates' : 'imported'] += 1;
