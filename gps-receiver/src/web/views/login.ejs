@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="<%= locale %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title><%= t('title') %></title><style>
+body{font-family:system-ui,sans-serif;background:#f5f7fb;color:#14213d;margin:0;display:grid;min-height:100vh;place-items:center}
+main{width:min(360px,calc(100% - 32px));background:#fff;border:1px solid #dce3ed;padding:24px;border-radius:8px}label{display:block;margin-top:14px}
+input,button{box-sizing:border-box;width:100%;padding:11px;margin-top:6px;font:inherit}button{margin-top:20px}.error{color:#b42318}
+</style></head><body><main><h1><%= t('title') %></h1><% if (error) { %><p class="error"><%= t('invalid') %></p><% } %>
+<form method="post" action="/login"><label><%= t('username') %><input name="username" autocomplete="username" required></label>
+<label><%= t('password') %><input name="password" type="password" autocomplete="current-password" required></label><button type="submit"><%= t('login') %></button></form>
+</main></body></html>

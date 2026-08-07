@@ -78,19 +78,19 @@
 9. Hoàn thành Task 5:
    - Import JSONL streaming, không xóa nguồn, loại đúng ba smoke ID, idempotent.
    - CLI bắt buộc `--source`, mặc định dry-run; chỉ ghi khi có `--apply`.
-10. Task 6 đã hoàn thành phần lõi:
-   - Argon2id policy, token 32 byte, chỉ lưu SHA-256, idle 8 giờ, absolute 24 giờ và RBAC.
-   - Bộ test hiện tại: 54/54 đạt khi có database integration test.
+10. Task 6 đã hoàn thành:
+    - Argon2id policy, token 32 byte, chỉ lưu SHA-256, idle 8 giờ, absolute 24 giờ và RBAC.
+    - Login/logout HTTP, cookie an toàn, CSRF, trang đăng nhập Việt/Anh và CLI tạo/cập nhật user.
+    - Bộ test hiện tại: 56/56 đạt khi có database integration test.
 6. Đã bổ sung `.gitignore` để loại trừ `.npm-cache`, `node_modules`, runtime GPS, `.env`, log và tệp tạm.
 
 ### Đang làm dở
 
-- Task 6: còn login/logout HTTP, cookie `fleet_session`, CSRF middleware, trang đăng nhập song ngữ và CLI tạo user.
+- Task 7: cài database/service Windows production và bảo vệ file cấu hình.
 - PostgreSQL test sẽ được dừng khi kết thúc phiên; runtime/cache đều bị Git ignore và có thể khởi động lại.
 
 ### Chưa thực hiện
 
-- Phần còn lại của Task 6: HTTP login/CSRF và CLI bootstrap user.
 - Task 7: cài database/service Windows production.
 - Task 8: composition, diễn tập cutover và kiểm thử giai đoạn 1.
 - Toàn bộ giai đoạn 2, 3 và 4.

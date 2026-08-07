@@ -6,6 +6,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { createApp } = require('../src/app');
+const { ApplicationError } = require('../src/core/errors');
 
 const nowMs = new Date('2026-08-07T18:00:00.000Z').getTime();
 const payload = {
@@ -116,4 +117,63 @@ test('preserves the HTTP contract when PostgreSQL repository is used', async (t)
   assert.equal(commands[0].deviceId, payload.id);
   assert.match(commands[0].dedupeKey, /^[a-f0-9]{64}$/);
   assert.equal((await fetch(`${base}/health`)).status, 200);
+});
+
+test('protects management routes with safe login, CSRF and roles while ingestion stays public', async (t) => {
+  const revoked = [];
+  const authService = {
+    login: async (username, password) => {
+      if (username !== 'admin' || password !== 'correct password') throw new ApplicationError('INVALID_CREDENTIALS', 401);
+      return { sessionToken: 'session-admin', csrfToken: 'csrf-admin', user: { role: 'admin' } };
+    },
+    authenticate: async (token) => {
+      if (token === 'session-admin') return { user: { role: 'admin', locale: 'vi' }, csrfToken: 'csrf-admin' };
+      if (token === 'session-dispatcher') return { user: { role: 'dispatcher', locale: 'vi' }, csrfToken: 'csrf-dispatcher' };
+      throw new ApplicationError('UNAUTHENTICATED', 401);
+    },
+    logout: async (token) => { revoked.push(token); },
+    requireRole: (user, roles) => { if (!roles.includes(user.role)) throw new ApplicationError('FORBIDDEN', 403); },
+  };
+  const base = await runningApp(t, { authService, enableAuthTestRoutes: true });
+
+  const redirect = await fetch(`${base}/dashboard`, { redirect: 'manual' });
+  assert.equal(redirect.status, 302);
+  assert.equal(redirect.headers.get('location'), '/login');
+  assert.equal((await fetch(`${base}/login`)).status, 200);
+
+  const invalid = await fetch(`${base}/login`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'missing', password: 'wrong password' }),
+  });
+  assert.equal(invalid.status, 401);
+  assert.doesNotMatch(await invalid.text(), /missing/);
+
+  const login = await fetch(`${base}/login`, {
+    method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'admin', password: 'correct password' }),
+  });
+  assert.equal(login.status, 303);
+  const setCookie = login.headers.getSetCookie().join('; ');
+  assert.match(setCookie, /fleet_session=session-admin/);
+  assert.match(setCookie, /HttpOnly/);
+  assert.match(setCookie, /SameSite=Strict/);
+
+  assert.equal((await fetch(`${base}/dashboard`, { headers: { cookie: 'fleet_session=session-admin' } })).status, 200);
+  assert.equal((await fetch(`${base}/api/admin-test`, {
+    method: 'POST', headers: { cookie: 'fleet_session=session-dispatcher', 'x-csrf-token': 'csrf-dispatcher' },
+  })).status, 403);
+  assert.equal((await fetch(`${base}/api/admin-test`, {
+    method: 'POST', headers: { cookie: 'fleet_session=session-admin' },
+  })).status, 403);
+  assert.equal((await fetch(`${base}/api/admin-test`, {
+    method: 'POST', headers: { cookie: 'fleet_session=session-admin', 'x-csrf-token': 'csrf-admin' },
+  })).status, 204);
+  const logout = await fetch(`${base}/logout`, {
+    method: 'POST', redirect: 'manual',
+    headers: { cookie: 'fleet_session=session-admin', 'x-csrf-token': 'csrf-admin' },
+  });
+  assert.equal(logout.status, 303);
+  assert.deepEqual(revoked, ['session-admin']);
+  assert.match(logout.headers.getSetCookie().join('; '), /fleet_session=;.*Max-Age=0/);
+  assert.equal((await fetch(`${base}/?${new URLSearchParams(payload)}`)).status, 200);
 });

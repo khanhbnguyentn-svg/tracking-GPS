@@ -2,6 +2,24 @@
 
 function createAuthRepository(pool) {
   return {
+    async saveUser({ username, passwordHash, role }, update = false) {
+      const statement = update ? `
+        UPDATE users SET password_hash = $2, role = $3, password_changed_at = now(), updated_at = now()
+        WHERE lower(username) = lower($1)
+        RETURNING id, username, password_hash, role, locale, status
+      ` : `
+        INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)
+        ON CONFLICT (lower(username)) DO NOTHING
+        RETURNING id, username, password_hash, role, locale, status
+      `;
+      const result = await pool.query(statement, [username, passwordHash, role]);
+      if (!result.rows[0]) {
+        if (update) throw new Error('User does not exist. Remove --update to create it.');
+        throw new Error('User already exists. Use --update to replace credentials.');
+      }
+      return mapUser(result.rows[0]);
+    },
+
     async findUser(username) {
       const result = await pool.query(`
         SELECT id, username, password_hash, role, locale, status

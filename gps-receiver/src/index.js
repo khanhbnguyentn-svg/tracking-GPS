@@ -4,12 +4,15 @@ const { readConfig } = require('./config');
 const { createApp } = require('./app');
 const { createPool, closePool } = require('./db/pool');
 const { createPositionRepository } = require('./modules/tracking/position-repository');
+const { createAuthRepository } = require('./modules/auth/auth-repository');
+const { createAuthService } = require('./modules/auth/auth-service');
 
 async function main() {
   const config = readConfig();
   const pool = createPool(config);
   const repository = createPositionRepository(pool, { inactivityMs: config.inactivityMs });
-  const app = createApp({ ...config, repository });
+  const authService = createAuthService({ repository: createAuthRepository(pool) });
+  const app = createApp({ ...config, repository, authService });
   let stopping = false;
   const stop = async (signal) => {
     if (stopping) return;
