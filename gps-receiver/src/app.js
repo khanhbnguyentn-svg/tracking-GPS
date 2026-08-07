@@ -7,6 +7,8 @@ const { normalizeLocation } = require('./validation');
 const { createStore } = require('./store');
 const { createRateLimiter } = require('./rate-limit');
 const { dashboardHtml } = require('./dashboard');
+const { ApplicationError } = require('./core/errors');
+const { createIngestionService } = require('./modules/tracking/ingestion-service');
 
 const BODY_LIMIT = 16 * 1024;
 
@@ -48,12 +50,16 @@ function createApp(options) {
   const host = options.host ?? '0.0.0.0';
   const port = options.port ?? 5055;
   const now = options.now || Date.now;
-  const store = options.store || createStore({
+  const store = options.repository ? null : (options.store || createStore({
     dataDir: options.dataDir,
     now,
     retentionDays: options.retentionDays,
     inactivityMs: options.inactivityMs,
-  });
+  }));
+  const readModel = options.readModel || options.repository || store;
+  const ingestionService = options.repository
+    ? createIngestionService({ repository: options.repository, clock: () => new Date(now()) })
+    : null;
   const allow = createRateLimiter({ limit: options.rateLimit ?? 120, now });
   const updates = new EventEmitter();
   const eventClients = new Set();
@@ -61,8 +67,24 @@ function createApp(options) {
   async function ingest(input, request, response) {
     const source = request.socket.remoteAddress || 'unknown';
     if (!allow(source)) {
-      store.recordRejected();
+      store?.recordRejected();
       return sendJson(response, 429, { accepted: false, error: 'RATE_LIMITED' });
+    }
+    if (ingestionService) {
+      try {
+        const result = await ingestionService.ingest(input, { source });
+        updates.emit('location', result);
+        return sendJson(response, 200, {
+          accepted: true, deviceId: result.deviceId, receivedAt: result.receivedAt,
+        });
+      } catch (error) {
+        if (error instanceof ApplicationError) {
+          const body = { accepted: false, error: error.code };
+          if (error.field) body.field = error.field;
+          return sendJson(response, error.status, body);
+        }
+        throw error;
+      }
     }
     const normalized = normalizeLocation(input, now());
     if (!normalized.ok) {
@@ -94,10 +116,10 @@ function createApp(options) {
         if (body.error) return sendJson(response, 400, { error: body.error });
         return await ingest(body.value, request, response);
       }
-      if (url.pathname === '/api/devices' && request.method === 'GET') return sendJson(response, 200, store.devices());
-      if (url.pathname === '/api/stats' && request.method === 'GET') return sendJson(response, 200, store.stats());
+      if (url.pathname === '/api/devices' && request.method === 'GET') return sendJson(response, 200, await readModel.devices());
+      if (url.pathname === '/api/stats' && request.method === 'GET') return sendJson(response, 200, await readModel.stats());
       if (url.pathname === '/health' && request.method === 'GET') {
-        const healthy = store.health().writable;
+        const healthy = (await readModel.health()).writable;
         return sendJson(response, healthy ? 200 : 503, { status: healthy ? 'ok' : 'degraded' });
       }
       if (url.pathname === '/dashboard' && request.method === 'GET') {
@@ -128,7 +150,7 @@ function createApp(options) {
   updates.on('location', onLocation);
 
   async function start() {
-    await store.init();
+    if (store) await store.init();
     await new Promise((resolve, reject) => {
       server.once('error', reject);
       server.listen(port, host, () => { server.off('error', reject); resolve(); });
@@ -139,7 +161,7 @@ function createApp(options) {
     for (const client of eventClients) client.end();
     eventClients.clear();
     if (server.listening) await new Promise((resolve) => server.close(resolve));
-    await store.close();
+    if (store) await store.close();
   }
 
   return { server, start, stop };

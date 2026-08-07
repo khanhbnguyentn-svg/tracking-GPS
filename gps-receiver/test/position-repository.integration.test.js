@@ -44,6 +44,11 @@ integrationTest('stores a position once with normalized device and PostGIS coord
   assert.deepEqual(result.rows[0], {
     device_id: 'AND-A1B2C3D4E5F60718', lon: 106.7, lat: 10.8, rows: 1,
   });
+  const devices = await repository.devices();
+  assert.equal(devices[0].deviceId, 'AND-A1B2C3D4E5F60718');
+  assert.equal(devices[0].latitude, 10.8);
+  assert.equal((await repository.stats()).accepted, 1);
+  assert.equal((await repository.health()).writable, true);
 });
 
 integrationTest('rolls back the unknown device when the position insert fails', async () => {

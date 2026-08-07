@@ -93,3 +93,27 @@ test('returns 503 and does not claim acceptance when persistence fails', async (
   assert.equal((await response.json()).accepted, false);
   assert.equal((await fetch(`${base}/health`)).status, 503);
 });
+
+test('preserves the HTTP contract when PostgreSQL repository is used', async (t) => {
+  const commands = [];
+  const repository = {
+    insert: async (command) => {
+      commands.push(command);
+      return { record: { id: '9' }, duplicate: false };
+    },
+    health: async () => ({ writable: true, latencyMs: 1 }),
+    devices: async () => [],
+    stats: async () => ({ devices: 0, accepted: 1, rejected: 0, recentPerSecond: 0 }),
+  };
+  const base = await runningApp(t, { repository });
+  const response = await fetch(`${base}/?${new URLSearchParams(payload)}`);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    accepted: true, deviceId: payload.id, receivedAt: '2026-08-07T18:00:00.000Z',
+  });
+  assert.equal(commands.length, 1);
+  assert.equal(commands[0].deviceId, payload.id);
+  assert.match(commands[0].dedupeKey, /^[a-f0-9]{64}$/);
+  assert.equal((await fetch(`${base}/health`)).status, 200);
+});

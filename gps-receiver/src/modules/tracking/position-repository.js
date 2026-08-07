@@ -1,6 +1,6 @@
 'use strict';
 
-function createPositionRepository(pool) {
+function createPositionRepository(pool, { inactivityMs = 300000 } = {}) {
   return {
     async insert(command) {
       const client = await pool.connect();
@@ -65,6 +65,43 @@ function createPositionRepository(pool) {
       } catch {
         return { writable: false, latencyMs: Date.now() - started };
       }
+    },
+
+    async devices() {
+      const result = await pool.query(`
+        SELECT DISTINCT ON (d.id)
+          d.device_id, p.device_time, p.received_at,
+          ST_Y(p.location::geometry) AS latitude,
+          ST_X(p.location::geometry) AS longitude,
+          p.speed_knots, p.accuracy_meters,
+          CASE WHEN p.received_at >= now() - ($1 * interval '1 millisecond')
+            THEN 'active' ELSE 'inactive' END AS status
+        FROM tracking_devices d
+        JOIN gps_positions p ON p.tracking_device_id = d.id
+        ORDER BY d.id, p.received_at DESC
+      `, [inactivityMs]);
+      return result.rows.map((row) => ({
+        deviceId: row.device_id,
+        deviceTime: row.device_time,
+        receivedAt: row.received_at,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        speedKnots: row.speed_knots,
+        accuracyMeters: row.accuracy_meters,
+        status: row.status,
+      }));
+    },
+
+    async stats() {
+      const result = await pool.query(`
+        SELECT
+          (SELECT count(*)::int FROM gps_positions) AS accepted,
+          (SELECT count(*)::int FROM ingestion_rejections) AS rejected,
+          (SELECT count(*)::int FROM tracking_devices) AS devices,
+          (SELECT count(*)::int FROM gps_positions WHERE received_at >= now() - interval '1 second') AS recent
+      `);
+      const row = result.rows[0];
+      return { accepted: row.accepted, rejected: row.rejected, devices: row.devices, recentPerSecond: row.recent };
     },
   };
 }
