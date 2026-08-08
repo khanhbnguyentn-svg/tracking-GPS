@@ -14,12 +14,17 @@ function readConfig(env = process.env, programData = process.env.ProgramData || 
   const configuredDir = env.GPS_DATA_DIR || path.join(programData, 'InternalGpsReceiver', 'data');
   const core = loadConfig({ ...env, GPS_DATA_DIR: configuredDir }, path.resolve(__dirname, '..'));
   return {
+    nodeEnv: core.nodeEnv,
     host: core.host,
     port: core.port,
+    databaseUrl: core.databaseUrl,
+    sessionSecret: core.sessionSecret,
     dataDir: core.dataDir,
     retentionDays: integer(env, 'GPS_RETENTION_DAYS', 30, 1, 3650),
     inactivityMs: core.inactivityMinutes * 60000,
     rateLimit: core.rateLimit,
+    businessTimezone: core.businessTimezone,
+    trustProxy: core.trustProxy,
   };
 }
 

@@ -7,11 +7,16 @@ const { readConfig } = require('../src/config');
 
 test('uses safe runtime defaults', () => {
   const config = readConfig({}, 'C:\\ProgramData');
-  assert.deepEqual(config, {
-    host: '0.0.0.0', port: 5055,
-    dataDir: path.resolve('C:\\ProgramData', 'InternalGpsReceiver', 'data'),
-    retentionDays: 30, inactivityMs: 300000, rateLimit: 120,
-  });
+  assert.equal(config.nodeEnv, 'development');
+  assert.equal(config.host, '0.0.0.0');
+  assert.equal(config.port, 5055);
+  assert.equal(config.databaseUrl, 'postgres://fleet:test@127.0.0.1:5432/fleet_test');
+  assert.equal(config.dataDir, path.resolve('C:\\ProgramData', 'InternalGpsReceiver', 'data'));
+  assert.equal(config.retentionDays, 30);
+  assert.equal(config.inactivityMs, 300000);
+  assert.equal(config.rateLimit, 120);
+  assert.equal(config.businessTimezone, 'Asia/Ho_Chi_Minh');
+  assert.equal(config.trustProxy, false);
 });
 
 test('reads explicit environment values', () => {

@@ -6,8 +6,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "db:migrate": "node scripts/migrate.js",
+    "user:create": "node scripts/create-user.js",
     "import:jsonl": "node scripts/import-jsonl.js"
   },
   "dependencies": {

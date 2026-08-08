@@ -2,15 +2,11 @@
   <id>InternalGpsReceiver</id>
   <name>Internal GPS Receiver</name>
   <description>Receives Android GPS data over the private LAN.</description>
-  <executable>%BASE%\node\node.exe</executable>
-  <arguments>"%BASE%\app\src\index.js"</arguments>
+  <executable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</executable>
+  <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%BASE%\Start-GpsReceiver.ps1"</arguments>
   <workingdirectory>%BASE%\app</workingdirectory>
-  <env name="GPS_HOST" value="0.0.0.0" />
-  <env name="GPS_PORT" value="5055" />
+  <env name="GPS_ENV_FILE" value="@@ENV_FILE@@" />
   <env name="GPS_DATA_DIR" value="@@DATA_DIR@@" />
-  <env name="GPS_RETENTION_DAYS" value="30" />
-  <env name="GPS_INACTIVITY_MS" value="300000" />
-  <env name="GPS_RATE_LIMIT" value="120" />
   <serviceaccount>
     <username>NT AUTHORITY\LocalService</username>
   </serviceaccount>

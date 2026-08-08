@@ -7,6 +7,10 @@ const { normalizeLocation } = require('./validation');
 const { createStore } = require('./store');
 const { createRateLimiter } = require('./rate-limit');
 const { dashboardHtml } = require('./dashboard');
+const { ApplicationError } = require('./core/errors');
+const { createIngestionService } = require('./modules/tracking/ingestion-service');
+const { loadSession, requireCsrf, sessionToken } = require('./modules/auth/middleware');
+const { clearSessionCookies, renderLogin, sessionCookies } = require('./modules/auth/routes');
 
 const BODY_LIMIT = 16 * 1024;
 
@@ -18,6 +22,31 @@ function sendJson(response, status, body) {
     'cache-control': 'no-store',
   });
   response.end(content);
+}
+
+function redirect(response, status, location, cookies) {
+  const headers = { location, 'cache-control': 'no-store' };
+  if (cookies) headers['set-cookie'] = cookies;
+  response.writeHead(status, headers);
+  response.end();
+}
+
+function sendHtml(response, status, content) {
+  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  response.end(content);
+}
+
+function readForm(request) {
+  return new Promise((resolve) => {
+    let size = 0;
+    const chunks = [];
+    request.on('data', (chunk) => {
+      size += chunk.length;
+      if (size <= BODY_LIMIT) chunks.push(chunk);
+    });
+    request.on('end', () => resolve(size > BODY_LIMIT ? null : Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString('utf8')))));
+    request.on('error', () => resolve(null));
+  });
 }
 
 function readJson(request) {
@@ -48,12 +77,17 @@ function createApp(options) {
   const host = options.host ?? '0.0.0.0';
   const port = options.port ?? 5055;
   const now = options.now || Date.now;
-  const store = options.store || createStore({
+  const store = options.repository ? null : (options.store || createStore({
     dataDir: options.dataDir,
     now,
     retentionDays: options.retentionDays,
     inactivityMs: options.inactivityMs,
-  });
+  }));
+  const readModel = options.readModel || options.repository || store;
+  const ingestionService = options.repository
+    ? createIngestionService({ repository: options.repository, clock: () => new Date(now()) })
+    : null;
+  const authService = options.authService || null;
   const allow = createRateLimiter({ limit: options.rateLimit ?? 120, now });
   const updates = new EventEmitter();
   const eventClients = new Set();
@@ -61,8 +95,24 @@ function createApp(options) {
   async function ingest(input, request, response) {
     const source = request.socket.remoteAddress || 'unknown';
     if (!allow(source)) {
-      store.recordRejected();
+      store?.recordRejected();
       return sendJson(response, 429, { accepted: false, error: 'RATE_LIMITED' });
+    }
+    if (ingestionService) {
+      try {
+        const result = await ingestionService.ingest(input, { source });
+        updates.emit('location', result);
+        return sendJson(response, 200, {
+          accepted: true, deviceId: result.deviceId, receivedAt: result.receivedAt,
+        });
+      } catch (error) {
+        if (error instanceof ApplicationError) {
+          const body = { accepted: false, error: error.code };
+          if (error.field) body.field = error.field;
+          return sendJson(response, error.status, body);
+        }
+        throw error;
+      }
     }
     const normalized = normalizeLocation(input, now());
     if (!normalized.ok) {
@@ -94,10 +144,53 @@ function createApp(options) {
         if (body.error) return sendJson(response, 400, { error: body.error });
         return await ingest(body.value, request, response);
       }
-      if (url.pathname === '/api/devices' && request.method === 'GET') return sendJson(response, 200, store.devices());
-      if (url.pathname === '/api/stats' && request.method === 'GET') return sendJson(response, 200, store.stats());
+      if (authService && url.pathname === '/login' && request.method === 'GET') {
+        const locale = String(request.headers['accept-language'] || '').toLowerCase().startsWith('en') ? 'en' : 'vi';
+        return sendHtml(response, 200, renderLogin(locale));
+      }
+      if (authService && url.pathname === '/login' && request.method === 'POST') {
+        if (!String(request.headers['content-type'] || '').toLowerCase().startsWith('application/x-www-form-urlencoded')) {
+          return sendJson(response, 415, { error: 'UNSUPPORTED_MEDIA_TYPE' });
+        }
+        const form = await readForm(request);
+        if (!form) return sendJson(response, 413, { error: 'BODY_TOO_LARGE' });
+        try {
+          const login = await authService.login(form.username, form.password, {
+            clientIp: request.socket.remoteAddress, userAgent: request.headers['user-agent'],
+          });
+          return redirect(response, 303, '/dashboard', sessionCookies(login.sessionToken, login.csrfToken, Boolean(request.socket.encrypted)));
+        } catch (error) {
+          if (error instanceof ApplicationError && error.code === 'INVALID_CREDENTIALS') {
+            return sendHtml(response, 401, renderLogin('vi', true));
+          }
+          throw error;
+        }
+      }
+
+      const protectedPaths = new Set(['/api/devices', '/api/stats', '/dashboard', '/events', '/logout', '/api/admin-test']);
+      let session = null;
+      if (authService && protectedPaths.has(url.pathname)) {
+        try { session = await loadSession(request, authService); }
+        catch (error) {
+          if (request.method === 'GET' && !url.pathname.startsWith('/api/')) return redirect(response, 302, '/login');
+          throw error;
+        }
+      }
+      if (authService && url.pathname === '/logout' && request.method === 'POST') {
+        requireCsrf(request, session);
+        await authService.logout(sessionToken(request));
+        return redirect(response, 303, '/login', clearSessionCookies(Boolean(request.socket.encrypted)));
+      }
+      if (authService && options.enableAuthTestRoutes && url.pathname === '/api/admin-test' && request.method === 'POST') {
+        requireCsrf(request, session);
+        authService.requireRole(session.user, ['admin']);
+        response.writeHead(204);
+        return response.end();
+      }
+      if (url.pathname === '/api/devices' && request.method === 'GET') return sendJson(response, 200, await readModel.devices());
+      if (url.pathname === '/api/stats' && request.method === 'GET') return sendJson(response, 200, await readModel.stats());
       if (url.pathname === '/health' && request.method === 'GET') {
-        const healthy = store.health().writable;
+        const healthy = (await readModel.health()).writable;
         return sendJson(response, healthy ? 200 : 503, { status: healthy ? 'ok' : 'degraded' });
       }
       if (url.pathname === '/dashboard' && request.method === 'GET') {
@@ -115,8 +208,9 @@ function createApp(options) {
       }
       const known = ['/api/devices', '/api/stats', '/health', '/dashboard', '/events'].includes(url.pathname);
       return sendJson(response, known ? 405 : 404, { error: known ? 'METHOD_NOT_ALLOWED' : 'NOT_FOUND' });
-    } catch {
-      if (!response.headersSent) sendJson(response, 500, { error: 'INTERNAL_ERROR' });
+    } catch (error) {
+      if (!response.headersSent && error instanceof ApplicationError) sendJson(response, error.status, { error: error.code });
+      else if (!response.headersSent) sendJson(response, 500, { error: 'INTERNAL_ERROR' });
       else response.end();
     }
   });
@@ -128,7 +222,7 @@ function createApp(options) {
   updates.on('location', onLocation);
 
   async function start() {
-    await store.init();
+    if (store) await store.init();
     await new Promise((resolve, reject) => {
       server.once('error', reject);
       server.listen(port, host, () => { server.off('error', reject); resolve(); });
@@ -139,10 +233,15 @@ function createApp(options) {
     for (const client of eventClients) client.end();
     eventClients.clear();
     if (server.listening) await new Promise((resolve) => server.close(resolve));
-    await store.close();
+    if (store) await store.close();
   }
 
-  return { server, start, stop };
+  function forceStop() {
+    server.closeAllConnections?.();
+    if (server.listening) server.close();
+  }
+
+  return { server, start, stop, forceStop };
 }
 
 module.exports = { createApp };
