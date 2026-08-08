@@ -64,3 +64,44 @@ Describe 'Windows service assets' {
         $output | Should Not Match '(?i)password|secret='
     }
 }
+
+Describe 'D drive deployment paths' {
+    BeforeAll {
+        . (Join-Path $root 'windows\DeploymentPaths.ps1')
+    }
+
+    It 'derives every project path from D:\InternalGPS' {
+        $paths = Resolve-DeploymentPaths -RootPath 'D:\InternalGPS'
+        $paths.Root | Should Be 'D:\InternalGPS'
+        $paths.PostgresRoot | Should Be 'D:\InternalGPS\PostgreSQL'
+        $paths.PostgresDataRoot | Should Be 'D:\InternalGPS\PostgreSQLData'
+        $paths.ReceiverRoot | Should Be 'D:\InternalGPS\Receiver'
+        $paths.ReceiverDataRoot | Should Be 'D:\InternalGPS\ReceiverData'
+        $paths.BackupRoot | Should Be 'D:\InternalGPS\Backup'
+    }
+
+    It 'rejects relative, drive-root and parent-normalized paths' {
+        { Resolve-DeploymentPaths -RootPath 'InternalGPS' } | Should Throw
+        { Resolve-DeploymentPaths -RootPath 'D:\' } | Should Throw
+        { Resolve-DeploymentPaths -RootPath 'D:\InternalGPS\..' } | Should Throw
+    }
+
+    It 'accepts only a fixed NTFS volume with at least 20 GB free' {
+        Mock Get-Volume { [pscustomobject]@{ DriveType = 'Fixed'; FileSystemType = 'NTFS'; SizeRemaining = 21GB } }
+        Mock Test-Path { $false }
+        { Assert-DeploymentDrive (Resolve-DeploymentPaths 'D:\InternalGPS') } | Should Not Throw
+
+        Mock Get-Volume { [pscustomobject]@{ DriveType = 'Fixed'; FileSystemType = 'ReFS'; SizeRemaining = 21GB } }
+        { Assert-DeploymentDrive (Resolve-DeploymentPaths 'D:\InternalGPS') } | Should Throw
+
+        Mock Get-Volume { [pscustomobject]@{ DriveType = 'Fixed'; FileSystemType = 'NTFS'; SizeRemaining = 19GB } }
+        { Assert-DeploymentDrive (Resolve-DeploymentPaths 'D:\InternalGPS') } | Should Throw
+    }
+
+    It 'rejects an existing deployment root that is a reparse point' {
+        Mock Get-Volume { [pscustomobject]@{ DriveType = 'Fixed'; FileSystemType = 'NTFS'; SizeRemaining = 21GB } }
+        Mock Test-Path { $true }
+        Mock Get-Item { [pscustomobject]@{ Attributes = [IO.FileAttributes]::ReparsePoint } }
+        { Assert-DeploymentDrive (Resolve-DeploymentPaths 'D:\InternalGPS') } | Should Throw
+    }
+}
