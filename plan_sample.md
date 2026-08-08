@@ -86,6 +86,10 @@
     - Installer PostgreSQL/PostGIS, DPAPI, ACL, file môi trường ngoài repository và migration trước khi chạy service.
     - Tài liệu cài đặt, import, cutover và rollback dành cho IT.
     - Pester: 8/8 đạt; chưa chạy cài đặt production vì cần phiên Administrator trên máy server đích.
+12. Task 8 đã hoàn thành phần composition và load smoke local:
+    - Migration-before-listen, shutdown một lần, timeout 15 giây và đóng pool theo thứ tự.
+    - Load 10 phút ở 7 request/giây: 4.200 gửi, 4.200 lưu, p95 22,97 ms.
+    - Live JSONL import/cutover còn chờ dữ liệu thật và IT chạy trên server đích.
 6. Đã bổ sung `.gitignore` để loại trừ `.npm-cache`, `node_modules`, runtime GPS, `.env`, log và tệp tạm.
 
 ### Đang làm dở

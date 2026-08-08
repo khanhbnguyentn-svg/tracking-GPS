@@ -236,7 +236,12 @@ function createApp(options) {
     if (store) await store.close();
   }
 
-  return { server, start, stop };
+  function forceStop() {
+    server.closeAllConnections?.();
+    if (server.listening) server.close();
+  }
+
+  return { server, start, stop, forceStop };
 }
 
 module.exports = { createApp };
