@@ -49,3 +49,5 @@ Checklist máy thật: `docs/android-14-device-test-checklist.md`
 Thư mục `gps-receiver/` chứa web Node.js nhận trực tiếp contract OsmAnd hiện tại và JSON POST trên cổng `5055`. Sau khi cài Windows Service, mở dashboard tại `http://localhost:5055/dashboard`; điện thoại trong cùng Wi-Fi dùng profile mẫu trong `config/traccar-profile.example.json`.
 
 Web này là môi trường LAN độc lập, không phải Traccar và không được mở port-forward ra Internet. Receiver dùng PostgreSQL/PostGIS, có đăng nhập Admin/Dispatcher và tự chạy migration trước khi mở cổng. Xem `gps-receiver/README.md` để cài đặt, kiểm thử và vận hành.
+
+Trên Windows, bộ cài mặc định đặt toàn bộ server và dữ liệu dưới `D:\InternalGPS` bằng các thành phần miễn phí/mã nguồn mở. Chạy hai installer với `-WhatIf` trước, sau đó mới chạy thật trong Windows PowerShell Administrator.

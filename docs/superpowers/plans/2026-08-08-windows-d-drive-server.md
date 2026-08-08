@@ -6,7 +6,7 @@
 
 **Architecture:** A small shared PowerShell path module derives every project-owned directory from one normalized `-RootPath`. Database, receiver and uninstall scripts consume this model; Pester proves validation, `-WhatIf`, ACL and purge behavior before any production command is documented.
 
-**Tech Stack:** Windows PowerShell 5.1, Pester 3.4+, Node.js 24.19.0, PostgreSQL 17.10, PostGIS 3.6.2, WinSW 2.12.0.
+**Tech Stack:** Windows PowerShell 5.1, Pester 3.4+, Node.js 24.18.1, PostgreSQL 17.10, PostGIS 3.6.2, WinSW 2.12.0.
 
 ## Global Constraints
 

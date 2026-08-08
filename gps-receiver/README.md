@@ -30,11 +30,11 @@ Mở PowerShell Administrator rồi chạy:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
-.\gps-receiver\windows\Install-FleetDatabase.ps1
-.\gps-receiver\windows\Install-GpsReceiver.ps1
+.\gps-receiver\windows\Install-FleetDatabase.ps1 -RootPath 'D:\InternalGPS'
+.\gps-receiver\windows\Install-GpsReceiver.ps1 -RootPath 'D:\InternalGPS'
 ```
 
-Service `InternalGpsReceiver` tự khởi động cùng Windows. Source được cài tại `C:\Program Files\InternalGpsReceiver`; dữ liệu và log tại `C:\ProgramData\InternalGpsReceiver`.
+Hai lệnh trên mặc định dùng `-RootPath 'D:\InternalGPS'`; nên chạy `-WhatIf` trước khi cài thật. Service `InternalGpsReceiver` tự khởi động cùng Windows. Chương trình nằm tại `D:\InternalGPS\Receiver`; database, dữ liệu, log và backup nằm trong các thư mục con cùng root.
 
 Chỉ dùng trong LAN Private. Không cấu hình port-forward cho cổng `5055`.
 

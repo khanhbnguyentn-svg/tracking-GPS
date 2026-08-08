@@ -23,11 +23,25 @@ Describe 'Windows service assets' {
         $script | Should Match "FirewallName = 'InternalGpsReceiver-5055'"
     }
 
-    It 'preserves ProgramData unless PurgeData is explicitly supplied' {
+    It 'preserves database, GPS data and backup unless PurgeData is explicitly supplied' {
         $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Uninstall-GpsReceiver.ps1')
         $script | Should Match '\[switch\]\$PurgeData'
+        $script | Should Match "RootPath = 'D:\\InternalGPS'"
+        $script | Should Match 'DeploymentPaths\.ps1'
         $script | Should Match 'if \(\$PurgeData\)'
-        $script | Should Not Match 'Remove-Item[^\r\n]+DataRoot[^\r\n]+$'
+        $script | Should Match 'Remove-Item[^\r\n]+\$paths\.ReceiverRoot'
+        $script | Should Match 'Remove-Item[^\r\n]+\$paths\.ReceiverDataRoot'
+        $script | Should Not Match 'Remove-Item[^\r\n]+\$paths\.(PostgresDataRoot|BackupRoot)'
+        $script | Should Match '\$paths\.Root -ne ''D:\\InternalGPS'''
+        $script | Should Match 'ReparsePoint'
+    }
+
+    It 'pins official Node and WinSW artifacts by SHA-256' {
+        $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-GpsReceiver.ps1')
+        $script | Should Match 'node-v24\.18\.1-win-x64\.zip'
+        $script | Should Match 'EC56B84A7551893AB2324EBDFDC4AB974A63B4781162600B68A1293CC3E53765'
+        $script | Should Match 'WinSW-x64-v2\.12\.0\.exe'
+        $script | Should Match '05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA'
     }
 
     It 'prepares PostgreSQL and stable PostGIS on loopback without a database firewall rule' {

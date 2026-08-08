@@ -90,6 +90,12 @@
     - Migration-before-listen, shutdown một lần, timeout 15 giây và đóng pool theo thứ tự.
     - Load 10 phút ở 7 request/giây: 4.200 gửi, 4.200 lưu, p95 22,97 ms.
     - Live JSONL import/cutover còn chờ dữ liệu thật và IT chạy trên server đích.
+13. Deployment Windows ổ D đã hoàn thành phần mã nguồn:
+    - Một `-RootPath` mặc định `D:\InternalGPS` cho PostgreSQL, receiver, data và backup.
+    - Kiểm tra ổ cố định NTFS, tối thiểu 20 GB, từ chối drive root/reparse point và purge sai đường dẫn.
+    - Cài production vẫn cần người dùng chạy PowerShell Administrator trên máy server đích.
+    - Máy hiện tại: ổ D cố định, NTFS, còn khoảng 84,3 GB; Node 59/59 và Pester 15/15 đạt.
+    - Cache đã có Node.js 24.18.1 và WinSW 2.12.0 từ nguồn chính thức, hash khớp installer.
 6. Đã bổ sung `.gitignore` để loại trừ `.npm-cache`, `node_modules`, runtime GPS, `.env`, log và tệp tạm.
 
 ### Đang làm dở

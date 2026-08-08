@@ -9,12 +9,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ServiceName = 'InternalGpsReceiver'
 $FirewallName = 'InternalGpsReceiver-5055'
-$NodeHash = '57F71AB3652E797D84ACDDC79C81CC9FF1C6DDB2A1974CDB83F00FEE9BFF4C73'
+$NodeHash = 'EC56B84A7551893AB2324EBDFDC4AB974A63B4781162600B68A1293CC3E53765'
 $WinSWHash = '05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . (Join-Path $PSScriptRoot 'DeploymentPaths.ps1')
 $paths = Resolve-DeploymentPaths -RootPath $RootPath
-if (-not $NodeArchivePath) { $NodeArchivePath = Join-Path $projectRoot 'server\cache\node-v24.19.0-win-x64.zip' }
+if (-not $NodeArchivePath) { $NodeArchivePath = Join-Path $projectRoot 'server\cache\node-v24.18.1-win-x64.zip' }
 if (-not $WinSWPath) { $WinSWPath = Join-Path $projectRoot 'server\cache\WinSW-x64-v2.12.0.exe' }
 
 if ($WhatIfPreference) {
