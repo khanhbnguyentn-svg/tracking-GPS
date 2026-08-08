@@ -17,7 +17,7 @@ class ConfigFileCodec {
     fun decode(text: String): Result<ImportedProfile> = runCatching {
         val json = JSONObject(text)
         require(ALLOWED_FIELDS.containsAll(json.keys().asSequence().toSet())) { "File có trường không hỗ trợ" }
-        require(json.getInt("version") == VERSION) { "Phiên bản file không được hỗ trợ" }
+        require(json.getInt("version") in setOf(1, 2)) { "Phiên bản file không được hỗ trợ" }
 
         val name = json.getString("name").trim()
         val host = json.getString("host").trim()
@@ -31,6 +31,7 @@ class ConfigFileCodec {
             else -> error("Chế độ TLS không hợp lệ")
         }
         val pin = json.optString("certificatePin").takeIf(String::isNotBlank)
+        val token = if (json.has("ingestToken")) json.getString("ingestToken") else null
 
         require(name.isNotBlank()) { "Tên profile không được trống" }
         require(host.isNotBlank() && "://" !in host && host.none(Char::isWhitespace)) { "Host không hợp lệ" }
@@ -38,8 +39,9 @@ class ConfigFileCodec {
         require(interval in 15..86400) { "Chu kỳ gửi phải từ 15 đến 86400 giây" }
         require(scheme == Scheme.HTTPS || tlsMode == TlsMode.SYSTEM) { "HTTP không dùng cấu hình TLS" }
         if (tlsMode == TlsMode.PINNING) requireValidPin(pin)
+        require(token == null || TOKEN.matches(token)) { "Token kết nối không hợp lệ" }
 
-        ImportedProfile(name, host, port, scheme, interval, tlsMode, pin)
+        ImportedProfile(name, host, port, scheme, interval, tlsMode, pin, token)
     }
 
     private fun requireValidPin(pin: String?) {
@@ -49,9 +51,10 @@ class ConfigFileCodec {
     }
 
     private companion object {
-        const val VERSION = 1
+        const val VERSION = 2
+        val TOKEN = Regex("^[A-Za-z0-9_-]{43}$")
         val ALLOWED_FIELDS = setOf(
-            "version", "name", "host", "port", "scheme", "intervalSeconds", "tlsMode", "certificatePin",
+            "version", "name", "host", "port", "scheme", "intervalSeconds", "tlsMode", "certificatePin", "ingestToken",
         )
     }
 }

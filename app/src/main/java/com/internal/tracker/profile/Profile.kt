@@ -20,6 +20,7 @@ data class ProfileSecret(
     val host: String,
     val certificatePin: String? = null,
     val customCa: ByteArray? = null,
+    val ingestToken: String? = null,
 )
 
 data class Profile(
@@ -33,6 +34,7 @@ data class Profile(
     val certificatePin: String?,
     val customCa: ByteArray?,
     val active: Boolean,
+    val ingestToken: String? = null,
 )
 
 interface ProfileSecrets {

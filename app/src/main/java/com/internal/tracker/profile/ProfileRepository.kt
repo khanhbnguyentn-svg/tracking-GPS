@@ -26,7 +26,7 @@ class ProfileRepository(
                 tlsMode = profile.tlsMode.name,
             ),
         )
-        secrets.put(id, ProfileSecret(profile.host, profile.certificatePin, customCa))
+        secrets.put(id, ProfileSecret(profile.host, profile.certificatePin, customCa, profile.ingestToken))
         return id
     }
 
@@ -53,6 +53,7 @@ class ProfileRepository(
             secret.certificatePin,
             secret.customCa,
             row.active,
+            secret.ingestToken,
         )
     }
 }

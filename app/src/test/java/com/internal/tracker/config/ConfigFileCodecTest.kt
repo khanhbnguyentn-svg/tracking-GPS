@@ -1,6 +1,7 @@
 package com.internal.tracker.config
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,9 +21,36 @@ class ConfigFileCodecTest {
     }
 
     @Test
+    fun versionTwoAcceptsOnlyAValidOptionalPilotToken() {
+        val token = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        val valid = codec.decode("""{"version":2,"name":"Pilot","host":"a.trycloudflare.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":"$token"}""")
+        val empty = codec.decode("""{"version":2,"name":"Pilot","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":""}""")
+        val invalid = codec.decode("""{"version":2,"name":"Pilot","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":"not/a/token"}""")
+
+        assertEquals(token, valid.getOrThrow().ingestToken)
+        assertTrue(empty.isFailure)
+        assertTrue(invalid.isFailure)
+    }
+
+    @Test
+    fun legacyVersionOneStillLoadsWithoutAToken() {
+        val result = codec.decode("""{"version":1,"name":"LAN","host":"192.168.1.61","port":5055,"scheme":"http","intervalSeconds":60,"tlsMode":"system"}""").getOrThrow()
+
+        assertEquals(null, result.ingestToken)
+    }
+
+    @Test
+    fun exportedTemplateIsVersionTwoWithoutASecret() {
+        val template = codec.encodeTemplate()
+
+        assertEquals(2, org.json.JSONObject(template).getInt("version"))
+        assertFalse(org.json.JSONObject(template).has("ingestToken"))
+    }
+
+    @Test
     fun rejectsUnknownFieldsAndVersions() {
         val unknown = codec.decode("""{"version":1,"name":"P","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","extra":true}""")
-        val future = codec.decode("""{"version":2,"name":"P","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system"}""")
+        val future = codec.decode("""{"version":3,"name":"P","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system"}""")
 
         assertTrue(unknown.isFailure)
         assertTrue(future.isFailure)

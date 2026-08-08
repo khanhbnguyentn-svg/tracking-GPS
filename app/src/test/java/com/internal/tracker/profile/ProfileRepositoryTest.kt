@@ -47,7 +47,19 @@ class ProfileRepositoryTest {
         assertFalse(secrets.values.containsKey(id))
     }
 
-    private fun profile(name: String) = ImportedProfile(name, "a.example", 443, Scheme.HTTPS, 60, TlsMode.SYSTEM)
+    @Test
+    fun savingPilotTokenKeepsItEncryptedOutsideRoom() = runTest {
+        val token = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        val repository = ProfileRepository(dao, secrets) { false }
+        val id = repository.save(profile("Pilot", token))
+
+        assertEquals(token, secrets.values.getValue(id).ingestToken)
+        assertEquals(token, repository.get(id)!!.ingestToken)
+        assertFalse(ProfileEntity::class.java.declaredFields.any { it.name == "ingestToken" })
+    }
+
+    private fun profile(name: String, ingestToken: String? = null) =
+        ImportedProfile(name, "a.example", 443, Scheme.HTTPS, 60, TlsMode.SYSTEM, ingestToken = ingestToken)
 }
 
 private class FakeProfileDao : ProfileDao {

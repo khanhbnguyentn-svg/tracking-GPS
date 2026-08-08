@@ -12,4 +12,5 @@ data class ImportedProfile(
     val intervalSeconds: Int,
     val tlsMode: TlsMode,
     val certificatePin: String? = null,
+    val ingestToken: String? = null,
 )

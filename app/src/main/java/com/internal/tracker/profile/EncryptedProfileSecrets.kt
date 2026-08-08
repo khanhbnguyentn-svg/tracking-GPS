@@ -22,6 +22,7 @@ class EncryptedProfileSecrets(context: Context) : ProfileSecrets {
                 host = json.getString("host"),
                 certificatePin = json.optString("pin").takeIf(String::isNotBlank),
                 customCa = json.optString("ca").takeIf(String::isNotBlank)?.let { Base64.decode(it, Base64.NO_WRAP) },
+                ingestToken = json.optString("token").takeIf(String::isNotBlank),
             )
         }
     }
@@ -30,6 +31,7 @@ class EncryptedProfileSecrets(context: Context) : ProfileSecrets {
         val json = JSONObject().put("host", value.host)
         value.certificatePin?.let { json.put("pin", it) }
         value.customCa?.let { json.put("ca", Base64.encodeToString(it, Base64.NO_WRAP)) }
+        value.ingestToken?.let { json.put("token", it) }
         preferences.edit().putString(id.toString(), json.toString()).apply()
     }
 
