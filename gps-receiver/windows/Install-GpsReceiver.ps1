@@ -88,9 +88,6 @@ if ($LASTEXITCODE -ne 0) { throw "Database migration failed with exit code $LAST
 if (-not $service) {
     & $wrapper install
     if ($LASTEXITCODE -ne 0) { throw "WinSW install failed with exit code $LASTEXITCODE." }
-} else {
-    & $wrapper refresh
-    if ($LASTEXITCODE -ne 0) { throw "WinSW refresh failed with exit code $LASTEXITCODE." }
 }
 
 $rule = Get-NetFirewallRule -DisplayName $FirewallName -ErrorAction SilentlyContinue

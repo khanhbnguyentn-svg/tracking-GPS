@@ -43,6 +43,11 @@ Describe 'Windows service assets' {
         $script | Should Match '05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA'
     }
 
+    It 'does not call the unsupported WinSW 2.12 refresh command' {
+        $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-GpsReceiver.ps1')
+        $script | Should Not Match '& \$wrapper refresh'
+    }
+
     It 'prepares PostgreSQL and stable PostGIS on loopback without a database firewall rule' {
         $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-FleetDatabase.ps1')
         $script | Should Match 'PostgreSQL 17\.10'
