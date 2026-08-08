@@ -207,6 +207,15 @@ Describe 'Quick Tunnel pilot lifecycle' {
         $script | Should Not Match '\$secretPath\s*=\s*Join-Path \$pilotRoot ''pilot-ingest\.dpapi'''
     }
 
+    It 'applies pilot ACLs using Windows security identifiers' {
+        $pilotPath = Join-Path $TestDrive 'Pilot'
+        $secretPath = Join-Path $TestDrive 'pilot-ingest.dpapi'
+        New-Item -ItemType Directory -Path $pilotPath | Out-Null
+        New-Item -ItemType File -Path $secretPath | Out-Null
+
+        { Set-PilotAccess $pilotPath $secretPath } | Should Not Throw
+    }
+
     It 'matches a pilot only when executable and command line agree with state' {
         $state = [pscustomobject]@{ Pid = 42; ExecutablePath = 'D:\Tools\cloudflared.exe' }
         $matching = [pscustomobject]@{

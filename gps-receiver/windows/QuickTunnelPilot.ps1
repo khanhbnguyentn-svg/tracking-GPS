@@ -181,7 +181,8 @@ function Set-PilotAccess([string]$PilotPath, [string]$SecretPath) {
     $directoryAcl = New-Object Security.AccessControl.DirectorySecurity
     $directoryAcl.SetAccessRuleProtection($true, $false)
     foreach ($sid in @('S-1-5-18', 'S-1-5-32-544', $identity.User.Value)) {
-        $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', $inherit, $none, $allow)
+        $principal = New-Object Security.Principal.SecurityIdentifier($sid)
+        $rule = New-Object Security.AccessControl.FileSystemAccessRule($principal, 'FullControl', $inherit, $none, $allow)
         $directoryAcl.AddAccessRule($rule)
     }
     Set-Acl -LiteralPath $PilotPath -AclObject $directoryAcl
@@ -190,9 +191,11 @@ function Set-PilotAccess([string]$PilotPath, [string]$SecretPath) {
         $fileAcl = New-Object Security.AccessControl.FileSecurity
         $fileAcl.SetAccessRuleProtection($true, $false)
         foreach ($sid in @('S-1-5-18', 'S-1-5-32-544', $identity.User.Value)) {
-            $fileAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', $allow)))
+            $principal = New-Object Security.Principal.SecurityIdentifier($sid)
+            $fileAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($principal, 'FullControl', $allow)))
         }
-        $fileAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule('S-1-5-19', 'Read', $allow)))
+        $localService = New-Object Security.Principal.SecurityIdentifier('S-1-5-19')
+        $fileAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($localService, 'Read', $allow)))
         Set-Acl -LiteralPath $SecretPath -AclObject $fileAcl
     }
 }
