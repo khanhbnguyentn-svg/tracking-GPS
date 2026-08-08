@@ -11,7 +11,7 @@ HTTP chỉ dành cho mô phỏng trong LAN Private. Không dùng cấu hình nà
 
 ## Thử nghiệm Internet hai ngày
 
-Cloudflare Quick Tunnel chỉ dùng cho thử nghiệm một điện thoại trong hai ngày, **không phải cấu hình production**. IT phải giữ PC bật, ngăn Windows sleep và để hai service `InternalGpsReceiver`, `InternalTraccar-PostgreSQL` chạy trong suốt thử nghiệm.
+Cloudflare Quick Tunnel chỉ dùng cho thử nghiệm một điện thoại trong hai ngày, **không phải cấu hình production**. IT phải giữ PC bật, ngăn Windows sleep, duy trì kết nối Internet và để hai service `InternalGpsReceiver`, `InternalTraccar-PostgreSQL` chạy trong suốt thử nghiệm.
 
 Khi tracking đang dừng trên điện thoại:
 

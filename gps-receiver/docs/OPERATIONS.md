@@ -65,7 +65,7 @@ Trên điện thoại cùng mạng LAN, URL receiver có dạng `http://<IP-WIND
 
 ## Quick Tunnel thử nghiệm Internet hai ngày
 
-Quick Tunnel chỉ dành cho pilot một điện thoại trong hai ngày, **không phải production**. Không mở port router, không nới firewall và không thay đổi PostgreSQL đang chỉ bind `127.0.0.1:5432`. Giữ PC bật và ngăn Windows sleep trong suốt pilot.
+Quick Tunnel chỉ dành cho pilot một điện thoại trong hai ngày, **không phải production**. Không mở port router, không nới firewall và không thay đổi PostgreSQL đang chỉ bind `127.0.0.1:5432`. Giữ PC bật, ngăn Windows sleep và duy trì kết nối Internet trong suốt pilot.
 
 Mở Windows PowerShell **Run as administrator** tại thư mục gốc repository, cài `cloudflared`, rồi chạy pilot:
 
