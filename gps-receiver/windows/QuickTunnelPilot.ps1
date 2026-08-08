@@ -252,8 +252,8 @@ switch ($Action) {
             Protect-PilotToken $token $secretPath
             Set-PilotAccess $pilotRoot $secretPath
 
-            Set-ReceiverPilotSecret $environmentPath $secretPath
             $receiverConfigured = $true
+            Set-ReceiverPilotSecret $environmentPath $secretPath
             Restart-Receiver
 
             Remove-PilotArtifact $logPath

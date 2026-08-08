@@ -217,19 +217,38 @@ Describe 'Quick Tunnel pilot lifecycle' {
         Test-PilotProcessRecord $state 'D:\Tools\cloudflared.exe' $different | Should Be $false
     }
 
-    It 'surfaces artifact deletion failure and retains state for a cleanup retry' {
+    It 'rolls back a post-replacement backup cleanup failure and retains state for retry' {
         Mock Restart-Receiver { }
+        $script:failNextBackupRemoval = $true
+        Mock Remove-PilotArtifact {
+            param([string]$Path)
+            if ($script:failNextBackupRemoval -and $Path -match '\.bak\.') {
+                $script:failNextBackupRemoval = $false
+                throw 'Simulated backup cleanup failure.'
+            }
+            if (Test-Path -LiteralPath $Path) { [IO.File]::Delete($Path) }
+            if (Test-Path -LiteralPath $Path) { throw "Pilot artifact could not be deleted: $Path" }
+        }
+        $script = Get-Content -Raw -Encoding UTF8 $pilotScriptPath
+        $startAction = $script.IndexOf("'Start' {")
+        $configuredMark = $script.IndexOf('$receiverConfigured = $true', $startAction)
+        $setCall = $script.IndexOf('Set-ReceiverPilotSecret $environmentPath $secretPath', $startAction)
+        $configuredMark | Should BeGreaterThan $startAction
+        $configuredMark | Should BeLessThan $setCall
         $environmentPath = Join-Path $TestDrive 'receiver.env'
         $secretPath = Join-Path $TestDrive 'pilot-ingest.dpapi'
         $profilePath = Join-Path $TestDrive 'tracking-pilot-profile.json'
         $statePath = Join-Path $TestDrive 'pilot-state.json'
-        Set-Content -Encoding UTF8 $environmentPath @('GPS_PORT=5055', "GPS_INGEST_TOKEN_SECRET_FILE=$secretPath")
+        Set-Content -Encoding UTF8 $environmentPath 'GPS_PORT=5055'
         Set-Content -Encoding UTF8 $secretPath 'encrypted'
+        $receiverConfigured = $true
+        { Set-ReceiverPilotSecret $environmentPath $secretPath } | Should Throw
+        (Get-Content -Raw $environmentPath) | Should Match 'GPS_INGEST_TOKEN_SECRET_FILE'
         New-Item -ItemType Directory -Path $profilePath | Out-Null
         Set-Content -Encoding UTF8 (Join-Path $profilePath 'blocker') 'not a profile file'
         Set-Content -Encoding UTF8 $statePath '{}'
 
-        { Clear-PilotConfiguration $environmentPath $secretPath $profilePath $statePath -ReceiverConfigured } | Should Throw
+        { Clear-PilotConfiguration $environmentPath $secretPath $profilePath $statePath -ReceiverConfigured:$receiverConfigured } | Should Throw
         (Get-Content -Raw $environmentPath) | Should Not Match 'GPS_INGEST_TOKEN_SECRET_FILE'
         Test-Path -LiteralPath $secretPath | Should Be $false
         Test-Path -LiteralPath $profilePath | Should Be $true
