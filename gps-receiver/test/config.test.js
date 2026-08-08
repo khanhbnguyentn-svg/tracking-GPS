@@ -23,10 +23,12 @@ test('reads explicit environment values', () => {
   const config = readConfig({
     GPS_HOST: '127.0.0.1', GPS_PORT: '15055', GPS_DATA_DIR: 'D:\\gps-data',
     GPS_RETENTION_DAYS: '7', GPS_INACTIVITY_MS: '60000', GPS_RATE_LIMIT: '500',
+    GPS_INGEST_TOKEN: 'abcdefghijklmnopqrstuvwxyz_0123456789-ABCDE',
   }, 'C:\\ProgramData');
   assert.equal(config.port, 15055);
   assert.equal(config.retentionDays, 7);
   assert.equal(config.rateLimit, 500);
+  assert.equal(config.ingestToken, 'abcdefghijklmnopqrstuvwxyz_0123456789-ABCDE');
 });
 
 for (const [name, env] of [

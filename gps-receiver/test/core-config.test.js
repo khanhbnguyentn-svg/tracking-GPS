@@ -7,6 +7,7 @@ const { loadConfig } = require('../src/core/config');
 
 const databaseUrl = 'postgres://fleet:test@127.0.0.1:5432/fleet_test';
 const sessionSecret = '0123456789abcdef0123456789abcdef';
+const ingestToken = 'abcdefghijklmnopqrstuvwxyz_0123456789-ABCDE';
 
 test('loads explicit test configuration and freezes the result', () => {
   const config = loadConfig({
@@ -19,6 +20,7 @@ test('loads explicit test configuration and freezes the result', () => {
     GPS_RATE_LIMIT: '500',
     GPS_INACTIVITY_MS: '60000',
     GPS_TRUST_PROXY: 'false',
+    GPS_INGEST_TOKEN: ingestToken,
   }, 'D:\\fleet');
 
   assert.deepEqual(config, {
@@ -32,6 +34,7 @@ test('loads explicit test configuration and freezes the result', () => {
     inactivityMinutes: 1,
     businessTimezone: 'Asia/Ho_Chi_Minh',
     trustProxy: false,
+    ingestToken,
   });
   assert.equal(Object.isFrozen(config), true);
 });
@@ -44,6 +47,7 @@ test('uses safe test defaults rooted in the application directory', () => {
   assert.equal(config.dataDir, path.resolve('D:\\fleet', 'runtime', 'data'));
   assert.equal(config.databaseUrl, 'postgres://fleet:test@127.0.0.1:5432/fleet_test');
   assert.equal(config.businessTimezone, 'Asia/Ho_Chi_Minh');
+  assert.equal(config.ingestToken, null);
 });
 
 test('requires database URL and a strong session secret in production', () => {
@@ -73,6 +77,8 @@ for (const [name, env, expected] of [
   ['invalid inactivity', { NODE_ENV: 'test', GPS_INACTIVITY_MS: '999' }, /Invalid GPS_INACTIVITY_MS/],
   ['invalid trust proxy', { NODE_ENV: 'test', GPS_TRUST_PROXY: 'yes' }, /Invalid GPS_TRUST_PROXY/],
   ['relative data directory', { NODE_ENV: 'test', GPS_DATA_DIR: 'runtime\\data' }, /Invalid GPS_DATA_DIR/],
+  ['empty ingest token', { NODE_ENV: 'test', GPS_INGEST_TOKEN: '' }, /Invalid GPS_INGEST_TOKEN/],
+  ['malformed ingest token', { NODE_ENV: 'test', GPS_INGEST_TOKEN: 'short' }, /Invalid GPS_INGEST_TOKEN/],
 ]) {
   test(`rejects ${name}`, () => {
     assert.throws(() => loadConfig(env, 'D:\\fleet'), expected);

@@ -1,6 +1,7 @@
 'use strict';
 
 const http = require('node:http');
+const { createHash, timingSafeEqual } = require('node:crypto');
 const { URL } = require('node:url');
 const { EventEmitter } = require('node:events');
 const { normalizeLocation } = require('./validation');
@@ -13,6 +14,15 @@ const { loadSession, requireCsrf, sessionToken } = require('./modules/auth/middl
 const { clearSessionCookies, renderLogin, sessionCookies } = require('./modules/auth/routes');
 
 const BODY_LIMIT = 16 * 1024;
+
+function authorized(request, expectedToken) {
+  if (!expectedToken) return true;
+  const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(String(request.headers.authorization || ''));
+  const supplied = match?.[1] || '';
+  const expectedHash = createHash('sha256').update(expectedToken).digest();
+  const suppliedHash = createHash('sha256').update(supplied).digest();
+  return timingSafeEqual(expectedHash, suppliedHash);
+}
 
 function sendJson(response, status, body) {
   const content = JSON.stringify(body);
@@ -88,11 +98,15 @@ function createApp(options) {
     ? createIngestionService({ repository: options.repository, clock: () => new Date(now()) })
     : null;
   const authService = options.authService || null;
+  const ingestToken = options.ingestToken || null;
   const allow = createRateLimiter({ limit: options.rateLimit ?? 120, now });
   const updates = new EventEmitter();
   const eventClients = new Set();
 
   async function ingest(input, request, response) {
+    if (!authorized(request, ingestToken)) {
+      return sendJson(response, 401, { accepted: false, error: 'UNAUTHORIZED_DEVICE' });
+    }
     const source = request.socket.remoteAddress || 'unknown';
     if (!allow(source)) {
       store?.recordRejected();
@@ -136,6 +150,9 @@ function createApp(options) {
       }
       if (url.pathname === '/api/locations') {
         if (request.method !== 'POST') return sendJson(response, 405, { error: 'METHOD_NOT_ALLOWED' });
+        if (!authorized(request, ingestToken)) {
+          return sendJson(response, 401, { accepted: false, error: 'UNAUTHORIZED_DEVICE' });
+        }
         if (!String(request.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
           return sendJson(response, 415, { error: 'UNSUPPORTED_MEDIA_TYPE' });
         }

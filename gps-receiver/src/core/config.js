@@ -42,6 +42,14 @@ function databaseUrl(env, nodeEnv) {
   return parsed.toString();
 }
 
+function ingestToken(env) {
+  if (env.GPS_INGEST_TOKEN === undefined) return null;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(env.GPS_INGEST_TOKEN)) {
+    throw new Error('Invalid GPS_INGEST_TOKEN.');
+  }
+  return env.GPS_INGEST_TOKEN;
+}
+
 function loadConfig(env = process.env, rootDir = path.resolve(__dirname, '..', '..')) {
   const nodeEnv = env.NODE_ENV || 'development';
   if (!ALLOWED_ENVIRONMENTS.has(nodeEnv)) throw new Error('Invalid NODE_ENV.');
@@ -79,6 +87,7 @@ function loadConfig(env = process.env, rootDir = path.resolve(__dirname, '..', '
     inactivityMinutes: inactivityMs / 60000,
     businessTimezone,
     trustProxy: boolean(env, 'GPS_TRUST_PROXY', false),
+    ingestToken: ingestToken(env),
   });
 }
 

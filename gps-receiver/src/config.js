@@ -25,6 +25,7 @@ function readConfig(env = process.env, programData = process.env.ProgramData || 
     rateLimit: core.rateLimit,
     businessTimezone: core.businessTimezone,
     trustProxy: core.trustProxy,
+    ingestToken: core.ingestToken,
   };
 }
 

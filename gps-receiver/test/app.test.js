@@ -13,6 +13,7 @@ const payload = {
   id: 'AND-0123456789ABCDEF', lat: 10.1, lon: 106.1,
   timestamp: Math.floor(nowMs / 1000), speed: 3.2, accuracy: 8,
 };
+const ingestToken = 'abcdefghijklmnopqrstuvwxyz_0123456789-ABCDE';
 
 async function runningApp(t, options = {}) {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gps-app-'));
@@ -48,6 +49,43 @@ test('accepts JSON POST and exposes devices, stats, health and dashboard', async
   const dashboard = await fetch(`${base}/dashboard`);
   assert.equal(dashboard.status, 200);
   assert.match(await dashboard.text(), /Thiết bị GPS/);
+});
+
+test('requires the ingestion token before accepting public GPS uploads', async (t) => {
+  let inserts = 0;
+  const repository = {
+    insert: async () => {
+      inserts += 1;
+      return { record: { id: '9' }, duplicate: false };
+    },
+    health: async () => ({ writable: true, latencyMs: 1 }),
+    devices: async () => [],
+    stats: async () => ({ devices: 0, accepted: inserts, rejected: 0, recentPerSecond: 0 }),
+  };
+  const base = await runningApp(t, { ingestToken, repository });
+  const params = new URLSearchParams(payload);
+
+  for (const response of [
+    await fetch(`${base}/?${params}`),
+    await fetch(`${base}/?${params}`, { headers: { authorization: 'Bearer wrong' } }),
+  ]) {
+    assert.equal(response.status, 401);
+    const body = await response.json();
+    assert.deepEqual(body, { accepted: false, error: 'UNAUTHORIZED_DEVICE' });
+    assert.doesNotMatch(JSON.stringify(body), new RegExp(ingestToken));
+  }
+  assert.equal(inserts, 0);
+
+  assert.equal((await fetch(`${base}/?${params}`, {
+    headers: { authorization: `Bearer ${ingestToken}` },
+  })).status, 200);
+  assert.equal((await fetch(`${base}/api/locations`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${ingestToken}` },
+    body: JSON.stringify(payload),
+  })).status, 200);
+  assert.equal(inserts, 2);
+  assert.equal((await fetch(`${base}/health`)).status, 200);
 });
 
 test('returns stable errors for invalid requests', async (t) => {
