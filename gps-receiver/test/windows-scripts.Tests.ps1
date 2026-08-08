@@ -188,6 +188,19 @@ Describe 'Quick Tunnel pilot lifecycle' {
         Find-QuickTunnelUrl @('INF https://trycloudflare.com.attacker.example') | Should Be $null
     }
 
+    It 'retries transient DNS failures while the public tunnel propagates' {
+        $script:httpAttempts = 0
+        Mock Invoke-WebRequest {
+            $script:httpAttempts++
+            if ($script:httpAttempts -lt 3) { throw [Net.WebException]::new('DNS is not ready') }
+            [pscustomobject]@{ StatusCode = 401 }
+        }
+        Mock Start-Sleep {}
+
+        Get-HttpStatus 'https://safe-name.trycloudflare.com/' @{} -Attempts 3 -DelayMilliseconds 0 | Should Be 401
+        $script:httpAttempts | Should Be 3
+    }
+
     It 'contains the required process and secret safety controls' {
         $script = Get-Content -Raw -Encoding UTF8 $pilotScriptPath
         $script | Should Match '\[ValidateSet\(''Start'', ''Status'', ''Stop''\)\]'

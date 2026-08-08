@@ -124,13 +124,21 @@ function Assert-ReceiverHealth([string]$Uri) {
     if ($health.status -ne 'ok') { throw "Receiver health check failed at $Uri" }
 }
 
-function Get-HttpStatus([string]$Uri, [hashtable]$Headers) {
-    try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -Headers $Headers -TimeoutSec 15
-        return [int]$response.StatusCode
-    } catch {
-        if ($_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }
-        throw
+function Get-HttpStatus(
+    [string]$Uri,
+    [hashtable]$Headers,
+    [int]$Attempts = 30,
+    [int]$DelayMilliseconds = 1000
+) {
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -Headers $Headers -TimeoutSec 15
+            return [int]$response.StatusCode
+        } catch {
+            if ($_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }
+            if ($attempt -eq $Attempts) { throw }
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
     }
 }
 
