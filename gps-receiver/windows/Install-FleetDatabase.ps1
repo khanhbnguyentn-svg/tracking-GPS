@@ -46,7 +46,8 @@ function Protect-Text([string]$Value, [string]$Path) {
 }
 
 function Unprotect-CurrentUserText([string]$Path) {
-    $secure = Get-Content -Raw -LiteralPath $Path | ConvertTo-SecureString
+    $serialized = (Get-Content -Raw -LiteralPath $Path).Trim()
+    $secure = $serialized | ConvertTo-SecureString
     $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
@@ -65,6 +66,7 @@ if (-not (Test-Path -LiteralPath $postgisControl)) {
         throw 'PostGIS 3.6.2 artifact SHA-256 mismatch.'
     }
     $temp = Join-Path $env:TEMP 'internal-gps-postgis-extract'
+    $restartDatabase = $false
     if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }
     try {
         Expand-Archive -LiteralPath $PostgisArchivePath -DestinationPath $temp -Force
@@ -72,9 +74,18 @@ if (-not (Test-Path -LiteralPath $postgisControl)) {
         if (-not $source -or -not (Test-Path (Join-Path $source.FullName 'share\extension\postgis.control'))) {
             throw 'PostGIS archive layout is invalid.'
         }
+        if ((Get-Service -Name $ServiceName).Status -eq 'Running') {
+            Stop-Service -Name $ServiceName
+            (Get-Service -Name $ServiceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+            $restartDatabase = $true
+        }
         Copy-Item -Path (Join-Path $source.FullName '*') -Destination $paths.PostgresRoot -Recurse -Force
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+        if ($restartDatabase) {
+            Start-Service -Name $ServiceName
+            (Get-Service -Name $ServiceName).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+        }
     }
 }
 
@@ -94,7 +105,9 @@ try {
     $createdb = Join-Path $paths.PostgresRoot 'bin\createdb.exe'
     $passwordEncryption = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc 'SHOW password_encryption').Trim()
     if ($passwordEncryption -ne 'scram-sha-256') { throw 'PostgreSQL must use scram-sha-256.' }
-    $roleExists = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='fleet_app'").Trim()
+    $roleExists = (@(& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='fleet_app'") -join '')
+    if ($LASTEXITCODE -ne 0) { throw 'Checking fleet_app failed.' }
+    $roleExists = $roleExists.Trim()
     if ($roleExists -ne '1') {
         "CREATE ROLE fleet_app LOGIN PASSWORD '$fleetPassword';" | & $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1
         if ($LASTEXITCODE -ne 0) { throw 'Creating fleet_app failed.' }
@@ -102,7 +115,9 @@ try {
     } elseif (-not (Test-Path -LiteralPath $databaseSecretPath)) {
         throw 'fleet_app exists but its protected local credential is missing.'
     }
-    $databaseExists = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='fleet_tracking'").Trim()
+    $databaseExists = (@(& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='fleet_tracking'") -join '')
+    if ($LASTEXITCODE -ne 0) { throw 'Checking fleet_tracking failed.' }
+    $databaseExists = $databaseExists.Trim()
     if ($databaseExists -ne '1') {
         & $createdb -h 127.0.0.1 -p 5432 -U postgres -O fleet_app fleet_tracking
         if ($LASTEXITCODE -ne 0) { throw 'Creating fleet_tracking failed.' }

@@ -18,7 +18,7 @@ if (-not $NodeArchivePath) { $NodeArchivePath = Join-Path $projectRoot 'server\c
 if (-not $WinSWPath) { $WinSWPath = Join-Path $projectRoot 'server\cache\WinSW-x64-v2.12.0.exe' }
 
 if ($WhatIfPreference) {
-    Write-Host "What if: install $ServiceName under $($paths.Root), preserve data, and open TCP 5055 for Profile 'Private' RemoteAddress 'LocalSubnet'."
+    Write-Host "What if: install $ServiceName under $($paths.Root), preserve data, and open TCP 5055 for Profile 'Any' RemoteAddress 'LocalSubnet'."
     exit 0
 }
 
@@ -82,7 +82,7 @@ try {
     & (Join-Path $nodeTarget 'npm.cmd') ci --omit=dev --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE." }
 } finally { Pop-Location }
-& (Join-Path $paths.ReceiverRoot 'Start-GpsReceiver.ps1') -Migrate
+& (Join-Path $paths.ReceiverRoot 'Start-GpsReceiver.ps1') -EnvironmentFile $environmentFile -Migrate
 if ($LASTEXITCODE -ne 0) { throw "Database migration failed with exit code $LASTEXITCODE." }
 
 if (-not $service) {
@@ -95,7 +95,7 @@ if (-not $service) {
 
 $rule = Get-NetFirewallRule -DisplayName $FirewallName -ErrorAction SilentlyContinue
 if ($rule) { Remove-NetFirewallRule -DisplayName $FirewallName }
-New-NetFirewallRule -DisplayName $FirewallName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5055 -Profile 'Private' -RemoteAddress 'LocalSubnet' | Out-Null
+New-NetFirewallRule -DisplayName $FirewallName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5055 -Profile 'Any' -RemoteAddress 'LocalSubnet' | Out-Null
 & $wrapper start
 if ($LASTEXITCODE -ne 0) { throw "WinSW start failed with exit code $LASTEXITCODE." }
 Write-Host "$ServiceName installed and started on TCP 5055."

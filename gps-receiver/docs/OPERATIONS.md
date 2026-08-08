@@ -29,17 +29,18 @@ Cài PostgreSQL/PostGIS, database `fleet_tracking`, rồi cài service:
 .\gps-receiver\windows\Install-GpsReceiver.ps1 -RootPath 'D:\InternalGPS'
 ```
 
-Database chỉ lắng nghe tại `127.0.0.1:5432`. Installer không tạo firewall rule cho cổng 5432. File cấu hình và secret nằm ngoài repository tại `D:\InternalGPS\ReceiverData`, được bảo vệ bằng ACL và DPAPI.
+Database chỉ lắng nghe tại `127.0.0.1:5432`. Installer không tạo firewall rule cho cổng 5432. Receiver chỉ cho phép TCP `5055` từ `LocalSubnet`, kể cả khi Windows phân loại mạng là Public. File cấu hình và secret nằm ngoài repository tại `D:\InternalGPS\ReceiverData`, được bảo vệ bằng ACL và DPAPI.
 
 Tạo tài khoản quản trị sau khi cài đặt. Nhập mật khẩu tối thiểu 12 ký tự qua stdin, không đặt mật khẩu trong câu lệnh:
 
 ```powershell
-$env:GPS_ENV_FILE='D:\InternalGPS\ReceiverData\config\receiver.env'
 $secure = Read-Host 'Nhap mat khau admin (toi thieu 12 ky tu)' -AsSecureString
 $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
 try {
     $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
-    $plain | & 'D:\InternalGPS\Receiver\Start-GpsReceiver.ps1' -CreateUser -Username admin -Role admin
+    $plain | & 'D:\InternalGPS\Receiver\Start-GpsReceiver.ps1' `
+        -EnvironmentFile 'D:\InternalGPS\ReceiverData\config\receiver.env' `
+        -CreateUser -Username admin -Role admin
 } finally {
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
     $plain = $null

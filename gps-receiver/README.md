@@ -36,6 +36,6 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 
 Hai lệnh trên mặc định dùng `-RootPath 'D:\InternalGPS'`; nên chạy `-WhatIf` trước khi cài thật. Service `InternalGpsReceiver` tự khởi động cùng Windows. Chương trình nằm tại `D:\InternalGPS\Receiver`; database, dữ liệu, log và backup nằm trong các thư mục con cùng root.
 
-Chỉ dùng trong LAN Private. Không cấu hình port-forward cho cổng `5055`.
+Chỉ dùng trong LAN nội bộ. Firewall giới hạn cổng `5055` cho `LocalSubnet`; không cấu hình port-forward cho cổng này.
 
 Hướng dẫn đầy đủ cho IT: `docs\OPERATIONS.md`. Database chỉ lắng nghe loopback và secret không nằm trong XML/repository.

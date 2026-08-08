@@ -10,11 +10,10 @@ Describe 'Windows service assets' {
         (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-FleetDatabase.ps1')) | Should Match 'GPS_PORT=5055'
     }
 
-    It 'limits the firewall rule to Private LocalSubnet' {
+    It 'limits the firewall rule to LocalSubnet on every Windows network profile' {
         $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-GpsReceiver.ps1')
-        $script | Should Match "Profile 'Private'"
+        $script | Should Match "Profile 'Any'"
         $script | Should Match "RemoteAddress 'LocalSubnet'"
-        $script | Should Not Match 'Profile Any'
     }
 
     It 'uses project-owned stable resource names' {
@@ -54,6 +53,17 @@ Describe 'Windows service assets' {
         $script | Should Not Match 'New-NetFirewallRule[^\r\n]+5432'
     }
 
+    It 'stops PostgreSQL while replacing PostGIS binaries and always starts it again' {
+        $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-FleetDatabase.ps1')
+        $stop = $script.IndexOf('Stop-Service -Name $ServiceName')
+        $copy = $script.IndexOf("Copy-Item -Path (Join-Path `$source.FullName '*')")
+        $start = $script.IndexOf('Start-Service -Name $ServiceName', $copy)
+        $stop | Should BeGreaterThan -1
+        $copy | Should BeGreaterThan $stop
+        $start | Should BeGreaterThan $copy
+        $script | Should Match 'finally\s*\{[^}]*Start-Service -Name \$ServiceName'
+    }
+
     It 'protects database settings with DPAPI and a restricted ProgramData ACL' {
         $script = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-FleetDatabase.ps1')
         $script | Should Match 'ProtectedData'
@@ -61,6 +71,9 @@ Describe 'Windows service assets' {
         $script | Should Match 'NT AUTHORITY\\LOCAL SERVICE:\(OI\)\(CI\)R'
         $script | Should Match 'BUILTIN\\Administrators:\(OI\)\(CI\)F'
         $script | Should Match 'SYSTEM:\(OI\)\(CI\)F'
+        $script | Should Match '\(Get-Content -Raw -LiteralPath \$Path\)\.Trim\(\)'
+        $script | Should Match '@\(& \$psql[^\r\n]+rolname=''fleet_app''[^\r\n]+-join'
+        $script | Should Match '@\(& \$psql[^\r\n]+datname=''fleet_tracking''[^\r\n]+-join'
     }
 
     It 'references a protected environment file instead of embedding a database password in XML' {
@@ -68,6 +81,12 @@ Describe 'Windows service assets' {
         $template | Should Match 'GPS_ENV_FILE'
         $template | Should Not Match 'GPS_DATABASE_URL'
         $template | Should Not Match 'PASSWORD'
+        $installer = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-GpsReceiver.ps1')
+        $installer | Should Match '-EnvironmentFile \$environmentFile -Migrate'
+        $launcher = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Start-GpsReceiver.ps1')
+        $launcher | Should Match 'Add-Type -AssemblyName System\.Security'
+        $launcher | Should Match '@\(\$input\)\s*-join'
+        $launcher | Should Match '\$passwordInput\s*\|\s*&\s*\(Join-Path \$PSScriptRoot ''node\\node\.exe''\)'
     }
 
     It 'performs no writes during database WhatIf' {
