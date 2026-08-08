@@ -335,6 +335,7 @@ private fun diagnosticText(result: DiagnosticResult) = when (result) {
     DiagnosticResult.ConnectionRefused -> "Máy chủ từ chối kết nối"
     DiagnosticResult.Timeout -> "Kết nối quá thời gian chờ"
     DiagnosticResult.TlsError -> "Chứng chỉ HTTPS không hợp lệ hoặc không khớp"
+    DiagnosticResult.AuthenticationError -> "Khóa kết nối không hợp lệ. Hãy nhập lại file cấu hình."
     is DiagnosticResult.HttpError -> "Máy chủ trả lỗi HTTP ${result.code}"
     is DiagnosticResult.NetworkError -> "Lỗi mạng: ${result.detail}"
 }

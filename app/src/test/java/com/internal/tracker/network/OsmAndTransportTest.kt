@@ -26,6 +26,22 @@ class OsmAndTransportTest {
     }
 
     @Test
+    fun bearerTokenIsAHeaderAndNeverAQueryParameter() {
+        val token = "pilot-token"
+        val request = OsmAndRequestFactory().create(profile(ingestToken = token), "AND-0123456789abcdef", location())
+
+        assertEquals("Bearer $token", request.header("Authorization"))
+        assertEquals(null, request.url.queryParameter("ingestToken"))
+    }
+
+    @Test
+    fun requestWithoutTokenHasNoAuthorizationHeader() {
+        val request = OsmAndRequestFactory().create(profile(), "AND-0123456789abcdef", location())
+
+        assertEquals(null, request.header("Authorization"))
+    }
+
+    @Test
     fun clientClassifiesSuccessAndHttpFailure() {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setResponseCode(200))
@@ -35,6 +51,19 @@ class OsmAndTransportTest {
 
             assertEquals(SendResult.Success, client.send(local, "AND-0123456789abcdef", location()))
             assertEquals(SendResult.HttpFailure(400), client.send(local, "AND-0123456789abcdef", location()))
+        }
+    }
+
+    @Test
+    fun unauthorizedResponseHasASpecificResult() {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(401))
+
+            val result = OsmAndClient(OkHttpClient(), OsmAndRequestFactory()).send(
+                profile(server.hostName, server.port, Scheme.HTTP), "AND-0123456789abcdef", location(),
+            )
+
+            assertEquals(SendResult.AuthenticationFailure, result)
         }
     }
 
@@ -49,7 +78,8 @@ class OsmAndTransportTest {
         host: String = "example.com",
         port: Int = 443,
         scheme: Scheme = Scheme.HTTPS,
-    ) = Profile(1, "P", host, port, scheme, 60, TlsMode.SYSTEM, null, null, true)
+        ingestToken: String? = null,
+    ) = Profile(1, "P", host, port, scheme, 60, TlsMode.SYSTEM, null, null, true, ingestToken)
 
     private fun location() = PendingLocation(1, 10.5, 20.25, 123_000, 1.0, 4.0)
 }

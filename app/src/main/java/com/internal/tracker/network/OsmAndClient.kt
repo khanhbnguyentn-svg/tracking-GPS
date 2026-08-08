@@ -20,7 +20,11 @@ class OsmAndClient(
 
     override fun send(profile: Profile, deviceId: String, location: PendingLocation): SendResult = try {
         clientFor(profile).newCall(requests.create(profile, deviceId, location)).execute().use { response ->
-            if (response.isSuccessful) SendResult.Success else SendResult.HttpFailure(response.code)
+            when {
+                response.isSuccessful -> SendResult.Success
+                response.code == 401 -> SendResult.AuthenticationFailure
+                else -> SendResult.HttpFailure(response.code)
+            }
         }
     } catch (_: UnknownHostException) {
         SendResult.DnsFailure

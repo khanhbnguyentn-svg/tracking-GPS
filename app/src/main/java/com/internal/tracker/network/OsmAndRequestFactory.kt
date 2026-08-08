@@ -19,7 +19,9 @@ class OsmAndRequestFactory {
             .addQueryParameter("speed", (location.speed * METERS_PER_SECOND_TO_KNOTS).toString())
             .addQueryParameter("accuracy", location.accuracy.toString())
             .build()
-        return Request.Builder().url(url).get().build()
+        return Request.Builder().url(url).get().apply {
+            profile.ingestToken?.let { header("Authorization", "Bearer $it") }
+        }.build()
     }
 
     private companion object {

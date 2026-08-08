@@ -40,6 +40,18 @@ class QueueUploaderTest {
     }
 
     @Test
+    fun retainsRowAndIncrementsRetryForAuthenticationFailure() = runTest {
+        val store = FakeQueueStore(1)
+        val uploader = QueueUploader(store, { profile() }, { "AND-0123456789abcdef" }, LocationSender { _, _, _ -> SendResult.AuthenticationFailure })
+
+        val summary = uploader.drain()
+
+        assertEquals(UploadSummary(0, 1), summary)
+        assertEquals(emptyList<Long>(), store.deleted)
+        assertEquals(listOf(1L), store.retried)
+    }
+
+    @Test
     fun limitsBatchToOneHundred() = runTest {
         val store = FakeQueueStore(150)
         val uploader = QueueUploader(store, { profile() }, { "AND-0123456789abcdef" }, LocationSender { _, _, _ -> SendResult.Success })

@@ -40,6 +40,7 @@ class ConnectionTester(
         SendResult.Refused -> DiagnosticResult.ConnectionRefused
         SendResult.Timeout -> DiagnosticResult.Timeout
         SendResult.TlsFailure -> DiagnosticResult.TlsError
+        SendResult.AuthenticationFailure -> DiagnosticResult.AuthenticationError
         is SendResult.HttpFailure -> DiagnosticResult.HttpError(code)
         is SendResult.NetworkFailure -> DiagnosticResult.NetworkError(message)
     }

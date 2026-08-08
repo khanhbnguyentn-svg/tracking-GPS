@@ -28,5 +28,16 @@ class ConnectionTesterTest {
         assertEquals(DiagnosticResult.HttpError(400), tester.sendLatest(profile(), "AND-0123456789abcdef", LocationSample(1.0, 2.0, 3, 0.0, 4.0)))
     }
 
+    @Test
+    fun authenticationFailureHasASpecificDiagnostic() {
+        val sample = LocationSample(1.0, 2.0, 3, 0.0, 4.0)
+
+        assertEquals(
+            DiagnosticResult.AuthenticationError,
+            ConnectionTester(NetworkProbe { SendResult.Success }, LocationSender { _, _, _ -> SendResult.AuthenticationFailure })
+                .sendLatest(profile(), "AND-0123456789abcdef", sample),
+        )
+    }
+
     private fun profile() = Profile(1, "P", "example.com", 443, Scheme.HTTPS, 60, TlsMode.SYSTEM, null, null, true)
 }
