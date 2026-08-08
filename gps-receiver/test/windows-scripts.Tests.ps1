@@ -164,3 +164,35 @@ Describe 'D drive deployment paths' {
         { Assert-DeploymentDrive (Resolve-DeploymentPaths 'D:\InternalGPS') } | Should Throw
     }
 }
+
+Describe 'Quick Tunnel pilot lifecycle' {
+    BeforeAll {
+        $pilotScriptPath = Join-Path $root 'windows\QuickTunnelPilot.ps1'
+        . $pilotScriptPath
+    }
+
+    It 'accepts only an HTTPS trycloudflare.com tunnel URL' {
+        $lines = @(
+            'INF Quick Tunnel available at http://bad.trycloudflare.com',
+            'INF Ignore https://trycloudflare.com.attacker.example',
+            'INF Visit https://safe-name.trycloudflare.com to connect'
+        )
+
+        (Find-QuickTunnelUrl $lines).AbsoluteUri | Should Be 'https://safe-name.trycloudflare.com/'
+        Find-QuickTunnelUrl @('INF http://bad.trycloudflare.com') | Should Be $null
+        Find-QuickTunnelUrl @('INF https://trycloudflare.com.attacker.example') | Should Be $null
+    }
+
+    It 'contains the required process and secret safety controls' {
+        $script = Get-Content -Raw -Encoding UTF8 $pilotScriptPath
+        $script | Should Match '\[ValidateSet\(''Start'', ''Status'', ''Stop''\)\]'
+        $script | Should Match 'RandomNumberGenerator'
+        $script | Should Match 'DataProtectionScope\]::LocalMachine'
+        $script | Should Match 'RedirectStandardError'
+        $script | Should Match 'Start-Process[^\r\n]+-WindowStyle Hidden'
+        $script | Should Match 'pilot-state\.json'
+        $script | Should Match 'ExecutablePath'
+        $script | Should Match 'GPS_INGEST_TOKEN_SECRET_FILE'
+        $script | Should Not Match 'Write-(Host|Output)[^\r\n]+(token|secret)'
+    }
+}
