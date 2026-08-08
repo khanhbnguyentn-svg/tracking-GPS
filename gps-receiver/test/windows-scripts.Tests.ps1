@@ -195,4 +195,57 @@ Describe 'Quick Tunnel pilot lifecycle' {
         $script | Should Match 'GPS_INGEST_TOKEN_SECRET_FILE'
         $script | Should Not Match 'Write-(Host|Output)[^\r\n]+(token|secret)'
     }
+
+    It 'stores the protected pilot token in the receiver secrets directory' {
+        $script = Get-Content -Raw -Encoding UTF8 $pilotScriptPath
+        $script | Should Match '\$secretPath\s*=\s*Join-Path \$paths\.ReceiverDataRoot ''secrets\\pilot-ingest\.dpapi'''
+        $script | Should Not Match '\$secretPath\s*=\s*Join-Path \$pilotRoot ''pilot-ingest\.dpapi'''
+    }
+
+    It 'matches a pilot only when executable and command line agree with state' {
+        $state = [pscustomobject]@{ Pid = 42; ExecutablePath = 'D:\Tools\cloudflared.exe' }
+        $matching = [pscustomobject]@{
+            ExecutablePath = 'D:\Tools\cloudflared.exe'
+            CommandLine = '"D:\Tools\cloudflared.exe" tunnel --url http://127.0.0.1:5055 --no-autoupdate'
+        }
+        $different = [pscustomobject]@{
+            ExecutablePath = 'D:\Tools\cloudflared.exe'
+            CommandLine = '"D:\Tools\cloudflared.exe" tunnel --url http://127.0.0.1:9999 --no-autoupdate'
+        }
+
+        Test-PilotProcessRecord $state 'D:\Tools\cloudflared.exe' $matching | Should Be $true
+        Test-PilotProcessRecord $state 'D:\Tools\cloudflared.exe' $different | Should Be $false
+    }
+
+    It 'surfaces artifact deletion failure and retains state for a cleanup retry' {
+        Mock Restart-Receiver { }
+        $environmentPath = Join-Path $TestDrive 'receiver.env'
+        $secretPath = Join-Path $TestDrive 'pilot-ingest.dpapi'
+        $profilePath = Join-Path $TestDrive 'tracking-pilot-profile.json'
+        $statePath = Join-Path $TestDrive 'pilot-state.json'
+        Set-Content -Encoding UTF8 $environmentPath @('GPS_PORT=5055', "GPS_INGEST_TOKEN_SECRET_FILE=$secretPath")
+        Set-Content -Encoding UTF8 $secretPath 'encrypted'
+        New-Item -ItemType Directory -Path $profilePath | Out-Null
+        Set-Content -Encoding UTF8 (Join-Path $profilePath 'blocker') 'not a profile file'
+        Set-Content -Encoding UTF8 $statePath '{}'
+
+        { Clear-PilotConfiguration $environmentPath $secretPath $profilePath $statePath -ReceiverConfigured } | Should Throw
+        (Get-Content -Raw $environmentPath) | Should Not Match 'GPS_INGEST_TOKEN_SECRET_FILE'
+        Test-Path -LiteralPath $secretPath | Should Be $false
+        Test-Path -LiteralPath $profilePath | Should Be $true
+        Test-Path -LiteralPath $statePath | Should Be $true
+    }
+
+    It 'finishes stale-state cleanup when pilot artifacts are already absent' {
+        Mock Restart-Receiver { }
+        $environmentPath = Join-Path $TestDrive 'stale-receiver.env'
+        $secretPath = Join-Path $TestDrive 'missing-pilot-ingest.dpapi'
+        $profilePath = Join-Path $TestDrive 'missing-tracking-pilot-profile.json'
+        $statePath = Join-Path $TestDrive 'stale-pilot-state.json'
+        Set-Content -Encoding UTF8 $environmentPath 'GPS_PORT=5055'
+        Set-Content -Encoding UTF8 $statePath '{}'
+
+        { Clear-PilotConfiguration $environmentPath $secretPath $profilePath $statePath -ReceiverConfigured } | Should Not Throw
+        Test-Path -LiteralPath $statePath | Should Be $false
+    }
 }

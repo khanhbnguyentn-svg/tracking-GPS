@@ -38,18 +38,27 @@ function Protect-PilotToken([string]$Value, [string]$Path) {
     }
 }
 
+function Remove-PilotArtifact([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        [IO.File]::Delete($Path)
+    }
+    if (Test-Path -LiteralPath $Path) { throw "Pilot artifact could not be deleted: $Path" }
+}
+
 function Write-EnvironmentFile([string]$EnvPath, [string[]]$Lines) {
     if (-not (Test-Path -LiteralPath $EnvPath -PathType Leaf)) {
         throw "Receiver environment file does not exist: $EnvPath"
     }
     $temporaryPath = "$EnvPath.tmp.$([Guid]::NewGuid().ToString('N'))"
+    $backupPath = "$EnvPath.bak.$([Guid]::NewGuid().ToString('N'))"
     $content = @($Lines) -join [Environment]::NewLine
     if ($content.Length -gt 0) { $content += [Environment]::NewLine }
     try {
         [IO.File]::WriteAllText($temporaryPath, $content, (New-Object Text.UTF8Encoding($false)))
-        [IO.File]::Replace($temporaryPath, $EnvPath, $null)
+        [IO.File]::Replace($temporaryPath, $EnvPath, $backupPath)
     } finally {
-        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+        Remove-PilotArtifact $temporaryPath
+        Remove-PilotArtifact $backupPath
     }
 }
 
@@ -63,24 +72,43 @@ function Remove-ReceiverPilotSecret([string]$EnvPath) {
     Write-EnvironmentFile $EnvPath $lines
 }
 
-function Test-PilotProcess([pscustomobject]$State, [string]$ExpectedExe) {
+function Test-PilotProcessRecord([pscustomobject]$State, [string]$ExpectedExe, [pscustomobject]$Process) {
     try {
         $processId = [int]$State.Pid
         if ($processId -le 0 -or [string]::IsNullOrWhiteSpace($State.ExecutablePath)) { return $false }
         $expectedPath = [IO.Path]::GetFullPath($ExpectedExe)
         if (-not $State.ExecutablePath.Equals($expectedPath, [StringComparison]::OrdinalIgnoreCase)) { return $false }
-        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop
-        if (-not $process -or [string]::IsNullOrWhiteSpace($process.ExecutablePath) -or
-            -not $process.ExecutablePath.Equals($expectedPath, [StringComparison]::OrdinalIgnoreCase)) {
+        if (-not $Process -or [string]::IsNullOrWhiteSpace($Process.ExecutablePath) -or
+            -not $Process.ExecutablePath.Equals($expectedPath, [StringComparison]::OrdinalIgnoreCase)) {
             return $false
         }
-        $commandLine = (($process.CommandLine -replace '"', '') -replace '\s+', ' ').Trim()
+        $commandLine = (($Process.CommandLine -replace '"', '') -replace '\s+', ' ').Trim()
         return $commandLine.EndsWith(
             'tunnel --url http://127.0.0.1:5055 --no-autoupdate',
             [StringComparison]::OrdinalIgnoreCase)
     } catch {
         return $false
     }
+}
+
+function Test-PilotProcess([pscustomobject]$State, [string]$ExpectedExe) {
+    try {
+        $processId = [int]$State.Pid
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop
+        return Test-PilotProcessRecord $State $ExpectedExe $process
+    } catch {
+        return $false
+    }
+}
+
+function Stop-PilotProcessIfMatched([pscustomobject]$State, [string]$ExpectedExe) {
+    $processId = [int]$State.Pid
+    if ($processId -le 0) { throw 'Pilot state contains an invalid process ID.' }
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop
+    if (-not $process -or -not (Test-PilotProcessRecord $State $ExpectedExe $process)) { return $false }
+    $stopped = Stop-Process -Id $processId -Force -PassThru -ErrorAction Stop
+    if (-not $stopped.WaitForExit(15000)) { throw "Quick Tunnel process $processId did not stop within 15 seconds." }
+    return $true
 }
 
 function Assert-Administrator {
@@ -112,6 +140,39 @@ function Restart-Receiver {
     Assert-ReceiverHealth 'http://127.0.0.1:5055/health'
 }
 
+function Clear-PilotConfiguration(
+    [string]$EnvironmentPath,
+    [string]$SecretPath,
+    [string]$ProfilePath,
+    [string]$StatePath,
+    [switch]$ReceiverConfigured,
+    [switch]$RetainState
+) {
+    $failures = New-Object 'Collections.Generic.List[Exception]'
+    $environmentCleared = -not $ReceiverConfigured
+    if ($ReceiverConfigured) {
+        try {
+            Remove-ReceiverPilotSecret $EnvironmentPath
+            $environmentCleared = $true
+        } catch {
+            $failures.Add($_.Exception)
+        }
+    }
+    try { Remove-PilotArtifact $ProfilePath } catch { $failures.Add($_.Exception) }
+    if ($environmentCleared) {
+        try { Remove-PilotArtifact $SecretPath } catch { $failures.Add($_.Exception) }
+    }
+    if ($ReceiverConfigured) {
+        try { Restart-Receiver } catch { $failures.Add($_.Exception) }
+    }
+    if ($failures.Count -eq 0 -and -not $RetainState) {
+        try { Remove-PilotArtifact $StatePath } catch { $failures.Add($_.Exception) }
+    }
+    if ($failures.Count -gt 0) {
+        throw [AggregateException]::new('Quick Tunnel pilot cleanup failed.', $failures.ToArray())
+    }
+}
+
 function Set-PilotAccess([string]$PilotPath, [string]$SecretPath) {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
@@ -123,9 +184,6 @@ function Set-PilotAccess([string]$PilotPath, [string]$SecretPath) {
         $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', $inherit, $none, $allow)
         $directoryAcl.AddAccessRule($rule)
     }
-    $localServiceRule = New-Object Security.AccessControl.FileSystemAccessRule(
-        'S-1-5-19', 'ReadAndExecute', [Security.AccessControl.InheritanceFlags]::None, $none, $allow)
-    $directoryAcl.AddAccessRule($localServiceRule)
     Set-Acl -LiteralPath $PilotPath -AclObject $directoryAcl
 
     if ($SecretPath) {
@@ -151,7 +209,7 @@ if (-not $Action) { throw '-Action is required.' }
 $paths = Resolve-DeploymentPaths -RootPath $RootPath
 if ([IO.Path]::GetPathRoot($paths.Root) -ne 'D:\') { throw 'The pilot root must be on the D drive.' }
 $pilotRoot = Join-Path $paths.Root 'Pilot'
-$secretPath = Join-Path $pilotRoot 'pilot-ingest.dpapi'
+$secretPath = Join-Path $paths.ReceiverDataRoot 'secrets\pilot-ingest.dpapi'
 $profilePath = Join-Path $pilotRoot 'tracking-pilot-profile.json'
 $statePath = Join-Path $pilotRoot 'pilot-state.json'
 $logPath = Join-Path $pilotRoot 'cloudflared.log'
@@ -198,7 +256,8 @@ switch ($Action) {
             $receiverConfigured = $true
             Restart-Receiver
 
-            Remove-Item -LiteralPath $logPath, $stdoutPath -Force -ErrorAction SilentlyContinue
+            Remove-PilotArtifact $logPath
+            Remove-PilotArtifact $stdoutPath
             $tunnelProcess = Start-Process -FilePath $resolvedExe -ArgumentList @('tunnel', '--url', 'http://127.0.0.1:5055', '--no-autoupdate') -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $logPath -PassThru
             $pilotState = [pscustomobject]@{
                 Pid = $tunnelProcess.Id
@@ -245,15 +304,27 @@ switch ($Action) {
             Write-Host "PID: $($pilotState.Pid)"
             Write-Warning 'Restarting the tunnel changes its public URL and requires a new profile import.'
         } catch {
-            if ($pilotState -and (Test-PilotProcess $pilotState $resolvedExe)) {
-                Stop-Process -Id $pilotState.Pid -Force -ErrorAction SilentlyContinue
+            $startFailure = $_.Exception
+            $rollbackFailures = New-Object 'Collections.Generic.List[Exception]'
+            $rollbackFailures.Add($startFailure)
+            $retainState = $false
+            if ($pilotState) {
+                try { Stop-PilotProcessIfMatched $pilotState $resolvedExe | Out-Null }
+                catch {
+                    $retainState = $true
+                    $rollbackFailures.Add($_.Exception)
+                }
             }
-            Remove-Item -LiteralPath $profilePath, $secretPath, $statePath -Force -ErrorAction SilentlyContinue
-            if ($receiverConfigured) {
-                Remove-ReceiverPilotSecret $environmentPath
-                Restart-Receiver
+            try {
+                Clear-PilotConfiguration $environmentPath $secretPath $profilePath $statePath `
+                    -ReceiverConfigured:$receiverConfigured -RetainState:$retainState
+            } catch {
+                $rollbackFailures.Add($_.Exception)
             }
-            throw
+            if ($rollbackFailures.Count -gt 1) {
+                throw [AggregateException]::new('Quick Tunnel start and rollback failed.', $rollbackFailures.ToArray())
+            }
+            throw $startFailure
         } finally {
             if ($tokenBytes) { [Array]::Clear($tokenBytes, 0, $tokenBytes.Length) }
             $token = $null
@@ -276,15 +347,25 @@ switch ($Action) {
         Assert-Administrator
         Assert-DeploymentDrive -Paths $paths
         $pilotState = Read-PilotState $statePath
-        if (-not (Test-PilotProcess $pilotState $pilotState.ExecutablePath)) {
-            throw 'Refusing to stop a process that does not match the recorded Quick Tunnel pilot.'
+        $stopFailures = New-Object 'Collections.Generic.List[Exception]'
+        $processStopped = $false
+        try {
+            $processStopped = Stop-PilotProcessIfMatched $pilotState $pilotState.ExecutablePath
+        } catch {
+            $stopFailures.Add($_.Exception)
         }
-        Stop-Process -Id $pilotState.Pid -Force
-        Wait-Process -Id $pilotState.Pid -Timeout 15 -ErrorAction SilentlyContinue
-        Remove-ReceiverPilotSecret $environmentPath
-        Remove-Item -LiteralPath $secretPath, $profilePath, $statePath -Force -ErrorAction SilentlyContinue
-        Restart-Receiver
-        Write-Host "Stopped PID: $($pilotState.Pid)"
+        try {
+            Clear-PilotConfiguration $environmentPath $secretPath $profilePath $statePath `
+                -ReceiverConfigured -RetainState:($stopFailures.Count -gt 0)
+        } catch {
+            $stopFailures.Add($_.Exception)
+        }
+        if ($stopFailures.Count -gt 0) {
+            throw [AggregateException]::new('Quick Tunnel stop or cleanup failed.', $stopFailures.ToArray())
+        }
+        if ($processStopped) { Write-Host "Stopped PID: $($pilotState.Pid)" }
+        else { Write-Host 'Recorded pilot process was already absent or different; no process was stopped.' }
+        Write-Host 'Pilot credentials and state removed.'
         Write-Host "Retained log: $logPath"
     }
 }
