@@ -39,3 +39,7 @@ Hai lệnh trên mặc định dùng `-RootPath 'D:\InternalGPS'`; nên chạy `
 Chỉ dùng trong LAN nội bộ. Firewall giới hạn cổng `5055` cho `LocalSubnet`; không cấu hình port-forward cho cổng này.
 
 Hướng dẫn đầy đủ cho IT: `docs\OPERATIONS.md`. Database chỉ lắng nghe loopback và secret không nằm trong XML/repository.
+
+## Pilot Internet hai ngày
+
+Pilot một điện thoại dùng Cloudflare Quick Tunnel và token tạm thời; đây không phải production. Không mở port router hoặc PostgreSQL. IT dùng `windows\QuickTunnelPilot.ps1` với `-Action Start`, `Status`, rồi `Stop`; lệnh Stop thu hồi token dùng chung. Xem `docs\OPERATIONS.md` để triển khai và `docs\ANDROID.md` để import `D:\InternalGPS\Pilot\tracking-pilot-profile.json` cùng checklist Wi-Fi/mobile-data/offline queue.

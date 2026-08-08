@@ -63,6 +63,30 @@ Mở `http://localhost:5055/dashboard`, đăng nhập và kiểm tra thiết b�
 
 Trên điện thoại cùng mạng LAN, URL receiver có dạng `http://<IP-WINDOWS>:5055`. Thay `<IP-WINDOWS>` bằng địa chỉ IPv4 của máy server, ví dụ `http://192.168.80.146:5055`; không dùng `localhost` trên điện thoại.
 
+## Quick Tunnel thử nghiệm Internet hai ngày
+
+Quick Tunnel chỉ dành cho pilot một điện thoại trong hai ngày, **không phải production**. Không mở port router, không nới firewall và không thay đổi PostgreSQL đang chỉ bind `127.0.0.1:5432`. Giữ PC bật và ngăn Windows sleep trong suốt pilot.
+
+Mở Windows PowerShell **Run as administrator** tại thư mục gốc repository, cài `cloudflared`, rồi chạy pilot:
+
+```powershell
+winget install --id Cloudflare.cloudflared --exact
+.\gps-receiver\windows\QuickTunnelPilot.ps1 -Action Start -RootPath 'D:\InternalGPS'
+.\gps-receiver\windows\QuickTunnelPilot.ps1 -Action Status -RootPath 'D:\InternalGPS'
+```
+
+Start kiểm tra chữ ký Authenticode của `cloudflared.exe`, tạo token mới được bảo vệ bằng DPAPI, khởi động tunnel HTTPS `*.trycloudflare.com` và ghi profile import tại `D:\InternalGPS\Pilot\tracking-pilot-profile.json`. Không ghi token hoặc nội dung profile vào log hay tài liệu bàn giao.
+
+Khi tracking đang dừng, bàn giao file profile cho chủ điện thoại để import và chọn profile `Internet pilot 2 ngay`. Sau khi xác nhận import thành công, xóa file plaintext khỏi Windows. Chủ điện thoại thực hiện checklist trong `docs\ANDROID.md`; IT theo dõi bằng lệnh Status và ghi lại mọi gián đoạn.
+
+Kết thúc pilot sau hai ngày:
+
+```powershell
+.\gps-receiver\windows\QuickTunnelPilot.ps1 -Action Stop -RootPath 'D:\InternalGPS'
+```
+
+Stop thu hồi token dùng chung bằng cách xóa cấu hình secret khỏi receiver, xóa token DPAPI, profile plaintext và state, rồi khởi động lại receiver. Xác nhận PID tunnel đã dừng, URL public không còn hoạt động, `GPS_INGEST_TOKEN_SECRET_FILE` không còn trong `receiver.env`, `/health` LAN trả `200`, service receiver vẫn `Running/Automatic`; giữ `D:\InternalGPS\Pilot\cloudflared.log` để IT rà soát.
+
 ## Import dữ liệu JSONL cũ
 
 Không chạy trực tiếp trên thư mục dữ liệu duy nhất. Sao chép các file `locations-*.jsonl` sang một thư mục thử nghiệm trước.
