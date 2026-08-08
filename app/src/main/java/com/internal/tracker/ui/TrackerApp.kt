@@ -230,7 +230,7 @@ private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
         Spacer(Modifier.height(8.dp))
         profiles.forEach { profile ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text(profile.name); Text("${profile.scheme.name.lowercase()}://${profile.host}:${profile.port}", style = MaterialTheme.typography.bodySmall) }
+                Column(Modifier.weight(1f)) { Text(profile.name); Text("${profile.scheme.name.lowercase()}://${profile.host}:${profile.port}", style = MaterialTheme.typography.bodySmall) }
                 Row {
                     TextButton({ scope.launch { container.profiles.activate(profile.id) } }, enabled = !profile.active && !container.trackingController.isTracking()) { Text(if (profile.active) "Đang dùng" else "Dùng") }
                     TextButton({ scope.launch { container.profiles.delete(profile.id) } }, enabled = !profile.active) { Text("Xóa") }
