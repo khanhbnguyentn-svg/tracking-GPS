@@ -23,13 +23,16 @@ class ConfigFileCodecTest {
     @Test
     fun versionTwoAcceptsOnlyAValidOptionalPilotToken() {
         val token = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        val shortToken = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         val valid = codec.decode("""{"version":2,"name":"Pilot","host":"a.trycloudflare.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":"$token"}""")
         val empty = codec.decode("""{"version":2,"name":"Pilot","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":""}""")
         val invalid = codec.decode("""{"version":2,"name":"Pilot","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":"not/a/token"}""")
+        val wrongLength = codec.decode("""{"version":2,"name":"Pilot","host":"a.com","port":443,"scheme":"https","intervalSeconds":60,"tlsMode":"system","ingestToken":"$shortToken"}""")
 
         assertEquals(token, valid.getOrThrow().ingestToken)
         assertTrue(empty.isFailure)
         assertTrue(invalid.isFailure)
+        assertTrue(wrongLength.isFailure)
     }
 
     @Test
