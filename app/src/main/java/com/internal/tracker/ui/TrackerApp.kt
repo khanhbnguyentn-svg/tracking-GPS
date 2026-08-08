@@ -169,6 +169,7 @@ private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
     var tlsMode by rememberSaveable { mutableStateOf(TlsMode.SYSTEM) }
     var pin by rememberSaveable { mutableStateOf("") }
     var customCa by remember { mutableStateOf<ByteArray?>(null) }
+    var ingestToken by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf<ImportedProfile?>(null) }
 
@@ -193,26 +194,26 @@ private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
             OutlinedButton({ importLauncher.launch(arrayOf("application/json", "text/plain")) }) { Text("Nhập file") }
         }
         OutlinedTextField(name, { name = it }, label = { Text("Tên profile") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(host, { host = it }, label = { Text("Server host/IP") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(host, { host = it; ingestToken = null }, label = { Text("Server host/IP") }, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(scheme == Scheme.HTTP, { scheme = Scheme.HTTP; tlsMode = TlsMode.SYSTEM }, { Text("HTTP") })
-            FilterChip(scheme == Scheme.HTTPS, { scheme = Scheme.HTTPS }, { Text("HTTPS") })
+            FilterChip(scheme == Scheme.HTTP, { scheme = Scheme.HTTP; tlsMode = TlsMode.SYSTEM; ingestToken = null }, { Text("HTTP") })
+            FilterChip(scheme == Scheme.HTTPS, { scheme = Scheme.HTTPS; ingestToken = null }, { Text("HTTPS") })
         }
-        OutlinedTextField(port, { port = it.filter(Char::isDigit) }, label = { Text("Port") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(port, { port = it.filter(Char::isDigit); ingestToken = null }, label = { Text("Port") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(interval, { interval = it.filter(Char::isDigit) }, label = { Text("Chu kỳ gửi (giây)") }, modifier = Modifier.fillMaxWidth())
         if (scheme == Scheme.HTTPS) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(tlsMode == TlsMode.SYSTEM, { tlsMode = TlsMode.SYSTEM }, { Text("System CA") })
-                FilterChip(tlsMode == TlsMode.CUSTOM_CA, { tlsMode = TlsMode.CUSTOM_CA }, { Text("Custom CA") })
-                FilterChip(tlsMode == TlsMode.PINNING, { tlsMode = TlsMode.PINNING }, { Text("Pinning") })
+                FilterChip(tlsMode == TlsMode.SYSTEM, { tlsMode = TlsMode.SYSTEM; ingestToken = null }, { Text("System CA") })
+                FilterChip(tlsMode == TlsMode.CUSTOM_CA, { tlsMode = TlsMode.CUSTOM_CA; ingestToken = null }, { Text("Custom CA") })
+                FilterChip(tlsMode == TlsMode.PINNING, { tlsMode = TlsMode.PINNING; ingestToken = null }, { Text("Pinning") })
             }
             if (tlsMode == TlsMode.CUSTOM_CA) OutlinedButton({ caLauncher.launch(arrayOf("application/x-x509-ca-cert", "application/pkix-cert", "*/*")) }) { Text(if (customCa == null) "Chọn file .crt" else "Đã chọn certificate") }
-            if (tlsMode == TlsMode.PINNING) OutlinedTextField(pin, { pin = it }, label = { Text("SHA-256 pin") }, modifier = Modifier.fillMaxWidth())
+            if (tlsMode == TlsMode.PINNING) OutlinedTextField(pin, { pin = it; ingestToken = null }, label = { Text("SHA-256 pin") }, modifier = Modifier.fillMaxWidth())
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Button(
             onClick = {
-                val json = buildConfigJson(name, host, port, scheme, interval, tlsMode, pin)
+                val json = buildConfigJson(name, host, port, scheme, interval, tlsMode, pin, ingestToken)
                 container.configCodec.decode(json).onSuccess { profile ->
                     val caError = if (profile.tlsMode == TlsMode.CUSTOM_CA) runCatching {
                         TlsClientFactory().customCa(requireNotNull(customCa))
@@ -220,6 +221,7 @@ private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
                     if (caError != null) error = "File chứng chỉ X.509 không hợp lệ" else scope.launch {
                         val id = container.profiles.save(profile, customCa)
                         if (profiles.none { it.active }) container.profiles.activate(id)
+                        ingestToken = null
                         error = null
                     }
                 }.onFailure { error = it.message }
@@ -244,7 +246,7 @@ private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
             onDismissRequest = { preview = null },
             title = { Text("Xem trước cấu hình") },
             text = { Text("${imported.name}\n${imported.scheme.name.lowercase()}://${imported.host}:${imported.port}\nChu kỳ: ${imported.intervalSeconds} giây\nTLS: ${imported.tlsMode}") },
-            confirmButton = { TextButton({ name = imported.name; host = imported.host; port = imported.port.toString(); scheme = imported.scheme; interval = imported.intervalSeconds.toString(); tlsMode = imported.tlsMode; pin = imported.certificatePin.orEmpty(); preview = null }) { Text("Áp dụng vào form") } },
+            confirmButton = { TextButton({ name = imported.name; host = imported.host; port = imported.port.toString(); scheme = imported.scheme; interval = imported.intervalSeconds.toString(); tlsMode = imported.tlsMode; pin = imported.certificatePin.orEmpty(); ingestToken = imported.ingestToken; preview = null }) { Text("Áp dụng vào form") } },
             dismissButton = { TextButton({ preview = null }) { Text("Hủy") } },
         )
     }
@@ -340,8 +342,8 @@ private fun diagnosticText(result: DiagnosticResult) = when (result) {
     is DiagnosticResult.NetworkError -> "Lỗi mạng: ${result.detail}"
 }
 
-private fun buildConfigJson(name: String, host: String, port: String, scheme: Scheme, interval: String, tls: TlsMode, pin: String): String = org.json.JSONObject()
-    .put("version", 1)
+internal fun buildConfigJson(name: String, host: String, port: String, scheme: Scheme, interval: String, tls: TlsMode, pin: String, ingestToken: String? = null): String = org.json.JSONObject()
+    .put("version", if (ingestToken == null) 1 else 2)
     .put("name", name)
     .put("host", host)
     .put("port", port.toIntOrNull() ?: 0)
@@ -349,4 +351,5 @@ private fun buildConfigJson(name: String, host: String, port: String, scheme: Sc
     .put("intervalSeconds", interval.toIntOrNull() ?: 0)
     .put("tlsMode", when (tls) { TlsMode.SYSTEM -> "system"; TlsMode.CUSTOM_CA -> "customCa"; TlsMode.PINNING -> "pinning" })
     .apply { if (pin.isNotBlank()) put("certificatePin", pin) }
+    .apply { ingestToken?.let { put("ingestToken", it) } }
     .toString()
