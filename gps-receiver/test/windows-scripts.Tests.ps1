@@ -58,10 +58,33 @@ Describe 'Windows service assets' {
 
     It 'performs no writes during database WhatIf' {
         $target = Join-Path $TestDrive 'fleet-data'
-        $output = & (Join-Path $root 'windows\Install-FleetDatabase.ps1') -DataRoot $target -WhatIf 6>&1 | Out-String
+        $output = & (Join-Path $root 'windows\Install-FleetDatabase.ps1') -RootPath $target -WhatIf 6>&1 | Out-String
         $output | Should Match 'What if:'
         Test-Path -LiteralPath $target | Should Be $false
         $output | Should Not Match '(?i)password|secret='
+    }
+
+    It 'derives both installers from one D drive RootPath' {
+        $database = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-FleetDatabase.ps1')
+        $receiver = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'windows\Install-GpsReceiver.ps1')
+        foreach ($script in @($database, $receiver)) {
+            $script | Should Match "RootPath = 'D:\\InternalGPS'"
+            $script | Should Match 'DeploymentPaths\.ps1'
+        }
+        $database | Should Match '\$paths\.PostgresRoot'
+        $database | Should Match '\$paths\.PostgresDataRoot'
+        $database | Should Match '\$paths\.ReceiverDataRoot'
+        $receiver | Should Match '\$paths\.ReceiverRoot'
+        $receiver | Should Match '\$paths\.ReceiverDataRoot'
+        $database | Should Not Match '\[string\]\$PostgresRoot\s*='
+        $receiver | Should Not Match '\[string\]\$InstallRoot\s*='
+    }
+
+    It 'performs no writes during either RootPath WhatIf' {
+        $target = Join-Path $TestDrive 'InternalGPS'
+        & (Join-Path $root 'windows\Install-FleetDatabase.ps1') -RootPath $target -WhatIf 6>&1 | Out-Null
+        & (Join-Path $root 'windows\Install-GpsReceiver.ps1') -RootPath $target -WhatIf 6>&1 | Out-Null
+        Test-Path -LiteralPath $target | Should Be $false
     }
 }
 

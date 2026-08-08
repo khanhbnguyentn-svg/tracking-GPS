@@ -1,8 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [string]$PostgresRoot = 'C:\Program Files\InternalTraccar\PostgreSQL',
-    [string]$PostgresDataRoot = 'C:\ProgramData\InternalTraccar',
-    [string]$DataRoot = 'C:\ProgramData\InternalGpsReceiver',
+    [string]$RootPath = 'D:\InternalGPS',
     [string]$PostgisArchivePath,
     [string]$NativeInstallerPath
 )
@@ -12,11 +10,13 @@ $ErrorActionPreference = 'Stop'
 $ServiceName = 'InternalTraccar-PostgreSQL'
 $PostgisHash = '7BA180EE2A352987B9A2F194673652C59483B55852295CCF401DCECCD8765425'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+. (Join-Path $PSScriptRoot 'DeploymentPaths.ps1')
+$paths = Resolve-DeploymentPaths -RootPath $RootPath
 if (-not $PostgisArchivePath) { $PostgisArchivePath = Join-Path $projectRoot 'server\cache\postgis-bundle-pg17-3.6.2x64.zip' }
 if (-not $NativeInstallerPath) { $NativeInstallerPath = Join-Path $projectRoot 'server\scripts\Install-NativePostgres.ps1' }
 
 if ($WhatIfPreference) {
-    Write-Host "What if: prepare PostgreSQL 17.10 and PostGIS 3.6.2 on 127.0.0.1:5432 for fleet_tracking under $DataRoot."
+    Write-Host "What if: prepare PostgreSQL 17.10 and PostGIS 3.6.2 on 127.0.0.1:5432 under $($paths.Root)."
     exit 0
 }
 
@@ -53,12 +53,13 @@ function Unprotect-CurrentUserText([string]$Path) {
 }
 
 Assert-Administrator
+Assert-DeploymentDrive -Paths $paths
 if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
-    & $NativeInstallerPath -InstallRoot $PostgresRoot -DataRoot $PostgresDataRoot -ServiceName $ServiceName
+    & $NativeInstallerPath -InstallRoot $paths.PostgresRoot -DataRoot $paths.PostgresDataRoot -ServiceName $ServiceName
     if ($LASTEXITCODE -ne 0) { throw "PostgreSQL 17.10 installer failed with exit code $LASTEXITCODE." }
 }
 
-$postgisControl = Join-Path $PostgresRoot 'share\extension\postgis.control'
+$postgisControl = Join-Path $paths.PostgresRoot 'share\extension\postgis.control'
 if (-not (Test-Path -LiteralPath $postgisControl)) {
     if ((Get-FileHash -LiteralPath $PostgisArchivePath -Algorithm SHA256).Hash -ne $PostgisHash) {
         throw 'PostGIS 3.6.2 artifact SHA-256 mismatch.'
@@ -71,26 +72,26 @@ if (-not (Test-Path -LiteralPath $postgisControl)) {
         if (-not $source -or -not (Test-Path (Join-Path $source.FullName 'share\extension\postgis.control'))) {
             throw 'PostGIS archive layout is invalid.'
         }
-        Copy-Item -Path (Join-Path $source.FullName '*') -Destination $PostgresRoot -Recurse -Force
+        Copy-Item -Path (Join-Path $source.FullName '*') -Destination $paths.PostgresRoot -Recurse -Force
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
-$secretsRoot = Join-Path $DataRoot 'secrets'
-$configRoot = Join-Path $DataRoot 'config'
+$secretsRoot = Join-Path $paths.ReceiverDataRoot 'secrets'
+$configRoot = Join-Path $paths.ReceiverDataRoot 'config'
 $databaseSecretPath = Join-Path $secretsRoot 'fleet-db.dpapi'
 $sessionSecretPath = Join-Path $secretsRoot 'fleet-session.dpapi'
 $environmentPath = Join-Path $configRoot 'receiver.env'
-New-Item -ItemType Directory -Force -Path $DataRoot, $secretsRoot, $configRoot | Out-Null
-& icacls.exe $DataRoot /inheritance:r /grant:r 'NT AUTHORITY\LOCAL SERVICE:(OI)(CI)R' 'BUILTIN\Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' | Out-Null
+New-Item -ItemType Directory -Force -Path $paths.ReceiverDataRoot, $paths.BackupRoot, $secretsRoot, $configRoot | Out-Null
+& icacls.exe $paths.ReceiverDataRoot /inheritance:r /grant:r 'NT AUTHORITY\LOCAL SERVICE:(OI)(CI)R' 'BUILTIN\Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' | Out-Null
 
 $fleetPassword = if (Test-Path -LiteralPath $databaseSecretPath) { $null } else { New-HexSecret }
-$adminSecretPath = Join-Path $PostgresDataRoot 'secrets\postgres.dpapi'
+$adminSecretPath = Join-Path $paths.PostgresDataRoot 'secrets\postgres.dpapi'
 $env:PGPASSWORD = Unprotect-CurrentUserText $adminSecretPath
 try {
-    $psql = Join-Path $PostgresRoot 'bin\psql.exe'
-    $createdb = Join-Path $PostgresRoot 'bin\createdb.exe'
+    $psql = Join-Path $paths.PostgresRoot 'bin\psql.exe'
+    $createdb = Join-Path $paths.PostgresRoot 'bin\createdb.exe'
     $passwordEncryption = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc 'SHOW password_encryption').Trim()
     if ($passwordEncryption -ne 'scram-sha-256') { throw 'PostgreSQL must use scram-sha-256.' }
     $roleExists = (& $psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='fleet_app'").Trim()

@@ -1,7 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [string]$InstallRoot = 'C:\Program Files\InternalGpsReceiver',
-    [string]$DataRoot = 'C:\ProgramData\InternalGpsReceiver',
+    [string]$RootPath = 'D:\InternalGPS',
     [string]$NodeArchivePath,
     [string]$WinSWPath
 )
@@ -13,11 +12,13 @@ $FirewallName = 'InternalGpsReceiver-5055'
 $NodeHash = '57F71AB3652E797D84ACDDC79C81CC9FF1C6DDB2A1974CDB83F00FEE9BFF4C73'
 $WinSWHash = '05B82D46AD331CC16BDC00DE5C6332C1EF818DF8CEEFCD49C726553209B3A0DA'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+. (Join-Path $PSScriptRoot 'DeploymentPaths.ps1')
+$paths = Resolve-DeploymentPaths -RootPath $RootPath
 if (-not $NodeArchivePath) { $NodeArchivePath = Join-Path $projectRoot 'server\cache\node-v24.19.0-win-x64.zip' }
 if (-not $WinSWPath) { $WinSWPath = Join-Path $projectRoot 'server\cache\WinSW-x64-v2.12.0.exe' }
 
 if ($WhatIfPreference) {
-    Write-Host "What if: install $ServiceName into $InstallRoot, preserve data in $DataRoot, and open TCP 5055 for Profile 'Private' RemoteAddress 'LocalSubnet'."
+    Write-Host "What if: install $ServiceName under $($paths.Root), preserve data, and open TCP 5055 for Profile 'Private' RemoteAddress 'LocalSubnet'."
     exit 0
 }
 
@@ -26,6 +27,7 @@ $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Run this script from an elevated PowerShell session.'
 }
+Assert-DeploymentDrive -Paths $paths
 if ((Get-FileHash -LiteralPath $NodeArchivePath -Algorithm SHA256).Hash -ne $NodeHash) { throw 'Node.js archive SHA-256 mismatch.' }
 if ((Get-FileHash -LiteralPath $WinSWPath -Algorithm SHA256).Hash -ne $WinSWHash) { throw 'WinSW SHA-256 mismatch.' }
 if (Get-NetTCPConnection -LocalPort 5055 -State Listen -ErrorAction SilentlyContinue) {
@@ -33,11 +35,11 @@ if (Get-NetTCPConnection -LocalPort 5055 -State Listen -ErrorAction SilentlyCont
     if (-not $existing) { throw 'TCP port 5055 is already used by another process.' }
 }
 
-$wrapper = Join-Path $InstallRoot 'InternalGpsReceiver.exe'
-$config = Join-Path $InstallRoot 'InternalGpsReceiver.xml'
-$dataDir = Join-Path $DataRoot 'data'
-$logDir = Join-Path $DataRoot 'logs'
-$environmentFile = Join-Path $DataRoot 'config\receiver.env'
+$wrapper = Join-Path $paths.ReceiverRoot 'InternalGpsReceiver.exe'
+$config = Join-Path $paths.ReceiverRoot 'InternalGpsReceiver.xml'
+$dataDir = Join-Path $paths.ReceiverDataRoot 'data'
+$logDir = Join-Path $paths.ReceiverDataRoot 'logs'
+$environmentFile = Join-Path $paths.ReceiverDataRoot 'config\receiver.env'
 if (-not (Test-Path -LiteralPath $environmentFile)) { throw 'Run Install-FleetDatabase.ps1 before installing the receiver service.' }
 $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($service -and $service.Status -ne 'Stopped') {
@@ -45,21 +47,21 @@ if ($service -and $service.Status -ne 'Stopped') {
     Start-Sleep -Seconds 2
 }
 
-New-Item -ItemType Directory -Force -Path $InstallRoot, $DataRoot, $dataDir, $logDir | Out-Null
-& icacls.exe $DataRoot /inheritance:r /grant:r 'NT AUTHORITY\LOCAL SERVICE:(OI)(CI)M' 'BUILTIN\Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' | Out-Null
+New-Item -ItemType Directory -Force -Path $paths.ReceiverRoot, $paths.ReceiverDataRoot, $paths.BackupRoot, $dataDir, $logDir | Out-Null
+& icacls.exe $paths.ReceiverDataRoot /inheritance:r /grant:r 'NT AUTHORITY\LOCAL SERVICE:(OI)(CI)M' 'BUILTIN\Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' | Out-Null
 
 $nodeTemp = Join-Path $env:TEMP 'internal-gps-node-extract'
 if (Test-Path -LiteralPath $nodeTemp) { Remove-Item -LiteralPath $nodeTemp -Recurse -Force }
 Expand-Archive -LiteralPath $NodeArchivePath -DestinationPath $nodeTemp -Force
 $nodeSource = Get-ChildItem -LiteralPath $nodeTemp -Directory | Select-Object -First 1
 if (-not $nodeSource -or -not (Test-Path (Join-Path $nodeSource.FullName 'node.exe'))) { throw 'Node.js archive layout is invalid.' }
-$nodeTarget = Join-Path $InstallRoot 'node'
+$nodeTarget = Join-Path $paths.ReceiverRoot 'node'
 if (Test-Path -LiteralPath $nodeTarget) { Remove-Item -LiteralPath $nodeTarget -Recurse -Force }
 New-Item -ItemType Directory -Path $nodeTarget | Out-Null
 Copy-Item -Path (Join-Path $nodeSource.FullName '*') -Destination $nodeTarget -Recurse -Force
 Remove-Item -LiteralPath $nodeTemp -Recurse -Force
 
-$appTarget = Join-Path $InstallRoot 'app'
+$appTarget = Join-Path $paths.ReceiverRoot 'app'
 if (Test-Path -LiteralPath $appTarget) { Remove-Item -LiteralPath $appTarget -Recurse -Force }
 New-Item -ItemType Directory -Path $appTarget | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\src') -Destination $appTarget -Recurse -Force
@@ -67,7 +69,7 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\scripts') -Destinat
 Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\package.json') -Destination $appTarget -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot 'gps-receiver\package-lock.json') -Destination $appTarget -Force
 Copy-Item -LiteralPath $WinSWPath -Destination $wrapper -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-GpsReceiver.ps1') -Destination $InstallRoot -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-GpsReceiver.ps1') -Destination $paths.ReceiverRoot -Force
 
 $xml = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'InternalGpsReceiver.xml.template')
 $xml = $xml.Replace('@@DATA_DIR@@', [Security.SecurityElement]::Escape($dataDir))
@@ -80,7 +82,7 @@ try {
     & (Join-Path $nodeTarget 'npm.cmd') ci --omit=dev --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE." }
 } finally { Pop-Location }
-& (Join-Path $InstallRoot 'Start-GpsReceiver.ps1') -Migrate
+& (Join-Path $paths.ReceiverRoot 'Start-GpsReceiver.ps1') -Migrate
 if ($LASTEXITCODE -ne 0) { throw "Database migration failed with exit code $LASTEXITCODE." }
 
 if (-not $service) {
