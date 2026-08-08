@@ -87,6 +87,9 @@ Describe 'Windows service assets' {
         $launcher | Should Match 'Add-Type -AssemblyName System\.Security'
         $launcher | Should Match '@\(\$input\)\s*-join'
         $launcher | Should Match '\$passwordInput\s*\|\s*&\s*\(Join-Path \$PSScriptRoot ''node\\node\.exe''\)'
+        $launcher | Should Match 'if \(\$env:GPS_INGEST_TOKEN_SECRET_FILE\)'
+        $launcher | Should Match '\$env:GPS_INGEST_TOKEN\s*=\s*Unprotect-Text \$env:GPS_INGEST_TOKEN_SECRET_FILE'
+        $launcher | Should Not Match "SetEnvironmentVariable\([^\r\n]+GPS_INGEST_TOKEN[^\r\n]+(''User''|''Machine'')"
     }
 
     It 'performs no writes during database WhatIf' {

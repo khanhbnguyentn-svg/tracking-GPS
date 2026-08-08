@@ -26,6 +26,9 @@ Get-Content -LiteralPath $EnvironmentFile | ForEach-Object {
         [Environment]::SetEnvironmentVariable($key, $value, 'Process')
     }
 }
+if ($env:GPS_INGEST_TOKEN_SECRET_FILE) {
+    $env:GPS_INGEST_TOKEN = Unprotect-Text $env:GPS_INGEST_TOKEN_SECRET_FILE
+}
 $databasePassword = Unprotect-Text $env:GPS_DATABASE_SECRET_FILE
 $env:GPS_SESSION_SECRET = Unprotect-Text $env:GPS_SESSION_SECRET_FILE
 $env:GPS_DATABASE_URL = 'postgres://{0}:{1}@{2}:{3}/{4}' -f $env:GPS_DATABASE_USER,
