@@ -11,6 +11,7 @@ interface LocationRecordStore {
     suspend fun unsent(limit: Int): List<LocationRecord>
     suspend fun count(): Int
     fun observeBetween(from: Long, until: Long): Flow<List<LocationRecord>>
+    suspend fun between(from: Long, until: Long): List<LocationRecord>
     suspend fun markRetrying(ids: List<Long>, error: String)
     suspend fun markSent(ids: List<Long>, sentAt: Long)
 }
@@ -31,6 +32,9 @@ interface LocationRecordDao : LocationRecordStore {
 
     @Query("SELECT * FROM location_records WHERE capturedAt >= :from AND capturedAt < :until ORDER BY capturedAt DESC, id DESC")
     override fun observeBetween(from: Long, until: Long): Flow<List<LocationRecord>>
+
+    @Query("SELECT * FROM location_records WHERE capturedAt >= :from AND capturedAt < :until ORDER BY capturedAt, id")
+    override suspend fun between(from: Long, until: Long): List<LocationRecord>
 
     @Query("UPDATE location_records SET state = 'RETRYING', attemptCount = attemptCount + 1, lastError = :error WHERE id IN (:ids)")
     override suspend fun markRetrying(ids: List<Long>, error: String)

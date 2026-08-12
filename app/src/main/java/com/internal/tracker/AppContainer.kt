@@ -6,9 +6,16 @@ import androidx.room.Room
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.internal.tracker.config.ConfigFileCodec
+import com.internal.tracker.config.AdminPinStore
 import com.internal.tracker.config.DeviceIdProvider
+import com.internal.tracker.config.EncryptedPilotConfigStore
+import com.internal.tracker.config.EncryptedPinPreferences
 import com.internal.tracker.config.TlsMode
 import com.internal.tracker.data.AppDatabase
+import com.internal.tracker.export.DailyCsvStore
+import com.internal.tracker.history.LocationHistoryRepository
+import com.internal.tracker.mail.GmailSmtpSender
+import com.internal.tracker.mail.ReportDelivery
 import com.internal.tracker.network.ConnectionTester
 import com.internal.tracker.network.OkHttpNetworkProbe
 import com.internal.tracker.network.OsmAndClient
@@ -19,10 +26,16 @@ import com.internal.tracker.profile.Profile
 import com.internal.tracker.profile.ProfileRepository
 import com.internal.tracker.queue.LocationQueueRepository
 import com.internal.tracker.queue.LocationSample
+import com.internal.tracker.report.BatteryReader
+import com.internal.tracker.report.LocationSnapshotProvider
+import com.internal.tracker.report.ReportRun
+import com.internal.tracker.schedule.WorkManagerReportScheduler
 import com.internal.tracker.tracking.TrackingController
 import com.internal.tracker.tracking.TrackingPreferences
 import com.internal.tracker.worker.QueueUploader
 import okhttp3.OkHttpClient
+import java.time.Instant
+import java.time.ZoneId
 
 @Suppress("DEPRECATION")
 class AppContainer(context: Context) {
@@ -31,6 +44,8 @@ class AppContainer(context: Context) {
         .addMigrations(AppDatabase.MIGRATION_1_2)
         .build()
     val trackingPreferences = TrackingPreferences(appContext)
+    val pilotConfig = EncryptedPilotConfigStore(appContext)
+    val adminPin = AdminPinStore(EncryptedPinPreferences(appContext))
     val profiles = ProfileRepository(database.profileDao(), EncryptedProfileSecrets(appContext)) { trackingPreferences.enabled }
     val queue = LocationQueueRepository(database.pendingLocationDao())
     val configCodec = ConfigFileCodec()
@@ -61,6 +76,62 @@ class AppContainer(context: Context) {
     val queueUploader = QueueUploader(queue, profiles::active, deviceId::get, sender)
     val connectionTester = ConnectionTester(OkHttpNetworkProbe(clientFor), sender)
     val trackingController = TrackingController(appContext, trackingPreferences)
+
+    private val history = LocationHistoryRepository(database.locationRecordDao())
+    private val csv = DailyCsvStore(appContext)
+    private val gmail = GmailSmtpSender()
+    private val location = LocationSnapshotProvider(appContext)
+    private val battery = BatteryReader(appContext)
+    private val reportScheduler = WorkManagerReportScheduler(appContext)
+    private val delivery = ReportDelivery(
+        history = database.locationRecordDao(),
+        config = pilotConfig::load,
+        appVersion = BuildConfig.VERSION_NAME,
+        sender = gmail,
+        refreshBackup = ::refreshBackups,
+    )
+    val reportRun = ReportRun(
+        capture = location::capture,
+        persist = { captured, batteryPercent ->
+            val config = pilotConfig.load()
+            val id = history.capture(
+                captured,
+                batteryPercent,
+                (captured.capturedAt - trackingPreferences.startedAt).coerceAtLeast(0),
+                config.deviceNumber,
+                deviceId.get(),
+            )
+            trackingPreferences.lastLocationTime = captured.capturedAt
+            id
+        },
+        backup = { id ->
+            history.get(id)?.let { refreshBackups(listOf(it)) }
+        },
+        deliver = {
+            delivery.deliverPending().also { outcome ->
+                trackingPreferences.lastError = outcome.publicError
+                if (outcome.sent > 0) trackingPreferences.lastSendTime = System.currentTimeMillis()
+            }
+        },
+        batteryPercent = battery::percent,
+        scheduleNext = ::reconcileSchedule,
+    )
+
+    fun reconcileSchedule() {
+        val config = pilotConfig.load()
+        reportScheduler.reconcile(trackingPreferences.enabled, config.intervalHours, config.deviceNumber.toIntOrNull() ?: 1)
+    }
+
+    private suspend fun refreshBackups(records: List<com.internal.tracker.history.LocationRecord>) {
+        records.map { record ->
+            val zone = runCatching { ZoneId.of(record.timezone) }.getOrDefault(ZoneId.systemDefault())
+            Triple(record.deviceNumber, Instant.ofEpochMilli(record.capturedAt).atZone(zone).toLocalDate(), zone)
+        }.distinct().forEach { (number, date, zone) ->
+            val from = date.atStartOfDay(zone).toInstant().toEpochMilli()
+            val until = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            csv.writeDay(number, date, history.between(from, until))
+        }
+    }
 
     @Volatile
     var latestLocation: LocationSample? = null

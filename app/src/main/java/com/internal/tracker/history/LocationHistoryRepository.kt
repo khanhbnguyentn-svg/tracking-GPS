@@ -25,6 +25,7 @@ class LocationHistoryRepository(private val store: LocationRecordStore) {
     suspend fun unsent(limit: Int) = store.unsent(limit)
     suspend fun count() = store.count()
     fun observeBetween(from: Long, until: Long) = store.observeBetween(from, until)
+    suspend fun between(from: Long, until: Long) = store.between(from, until)
     suspend fun markRetrying(ids: List<Long>, error: String) = store.markRetrying(ids, error)
     suspend fun markSent(ids: List<Long>, sentAt: Long) = store.markSent(ids, sentAt)
 }

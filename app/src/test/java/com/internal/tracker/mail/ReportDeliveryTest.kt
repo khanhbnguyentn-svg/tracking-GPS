@@ -75,6 +75,7 @@ private class FakeMailHistoryStore(records: List<LocationRecord>) : LocationReco
     override suspend fun unsent(limit: Int) = rows.values.filter { it.state != DeliveryState.SENT }.take(limit)
     override suspend fun count() = rows.size
     override fun observeBetween(from: Long, until: Long): Flow<List<LocationRecord>> = flowOf(emptyList())
+    override suspend fun between(from: Long, until: Long): List<LocationRecord> = emptyList()
     override suspend fun markRetrying(ids: List<Long>, error: String) {
         ids.forEach { id -> rows[id]?.let { rows[id] = it.copy(state = DeliveryState.RETRYING, attemptCount = it.attemptCount + 1, lastError = error) } }
     }

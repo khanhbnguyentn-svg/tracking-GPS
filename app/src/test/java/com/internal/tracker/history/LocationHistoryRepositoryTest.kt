@@ -42,6 +42,7 @@ private class FakeLocationRecordStore : LocationRecordStore {
     override suspend fun unsent(limit: Int): List<LocationRecord> = rows.values.filter { it.state != DeliveryState.SENT }.take(limit)
     override suspend fun count(): Int = rows.size
     override fun observeBetween(from: Long, until: Long): Flow<List<LocationRecord>> = flowOf(rows.values.filter { it.capturedAt in from until until })
+    override suspend fun between(from: Long, until: Long): List<LocationRecord> = rows.values.filter { it.capturedAt in from until until }
 
     override suspend fun markRetrying(ids: List<Long>, error: String) {
         ids.forEach { id -> rows[id]?.let { rows[id] = it.copy(state = DeliveryState.RETRYING, attemptCount = it.attemptCount + 1, lastError = error) } }

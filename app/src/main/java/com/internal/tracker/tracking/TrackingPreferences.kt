@@ -16,4 +16,12 @@ class TrackingPreferences(context: Context) {
     var lastSendTime: Long
         get() = preferences.getLong("last_send", 0)
         set(value) = preferences.edit().putLong("last_send", value).apply()
+
+    var startedAt: Long
+        get() = preferences.getLong("started_at", 0)
+        set(value) = preferences.edit().putLong("started_at", value).apply()
+
+    var lastError: String?
+        get() = preferences.getString("last_error", null)
+        set(value) = preferences.edit().putString("last_error", value).apply()
 }
