@@ -15,9 +15,17 @@ import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
 import javax.mail.util.ByteArrayDataSource
 import javax.net.ssl.SSLException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+internal object SmtpExecutor {
+    suspend fun <T> run(dispatcher: CoroutineDispatcher = Dispatchers.IO, block: () -> T): T =
+        withContext(dispatcher) { block() }
+}
 
 class GmailSmtpSender : MailSender {
-    override suspend fun send(config: PilotConfig, message: ReportMessage): MailResult = classify {
+    override suspend fun send(config: PilotConfig, message: ReportMessage): MailResult = SmtpExecutor.run { classify {
         val session = session()
         val mail = MimeMessage(session).apply {
             setFrom(InternetAddress(config.sender))
@@ -38,7 +46,7 @@ class GmailSmtpSender : MailSender {
             transport.connect(HOST, PORT, config.sender, config.appPassword)
             transport.sendMessage(mail, mail.allRecipients)
         }
-    }
+    } }
 
     fun testCredentials(config: PilotConfig): MailResult = classify {
         session().getTransport("smtps").use { it.connect(HOST, PORT, config.sender, config.appPassword) }
