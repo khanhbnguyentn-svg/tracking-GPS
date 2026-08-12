@@ -55,7 +55,7 @@ Reporting is anchored to local calendar time in the device's current time zone:
 - 12 hours: 00:00 and 12:00;
 - 24 hours: 00:00.
 
-Devices are distributed deterministically across the 59 minutes following each anchor. For device number `n` in a 100-device fleet, the offset is `(n - 1) * 59 minutes / 99`. The same device keeps the same offset at every anchor.
+Devices are distributed deterministically across the 59 minutes following each anchor. For device number `n` in a 100-device fleet, the offset in seconds is `(n - 1) * 3540 / 99`. The same device keeps the same offset at every anchor. WorkManager can still coalesce nearby jobs, so this spacing reduces simultaneous requests but cannot guarantee second-level separation.
 
 A unique one-time WorkManager request is scheduled for the next calculated anchor plus offset. After every execution, reboot, time-zone change, clock change, interval change, or delayed run, the app recalculates from calendar anchors. It does not schedule the next report relative to the delayed completion time, which prevents cumulative drift.
 
@@ -75,15 +75,16 @@ Before any network attempt, the app writes a Room history record containing:
 - accuracy in metres when available;
 - battery percentage;
 - elapsed tracking duration;
+- record source (`CURRENT` or `LEGACY_IMPORT`);
 - delivery state and attempt metadata.
 
 Delivery states are `PENDING`, `SENT`, and `RETRYING`. Authentication or network errors do not create a terminal `FAILED` state because records remain eligible for a later retry. The UI presents the most recent failure reason separately.
 
-Room is the source of truth. Sent rows are retained as history rather than deleted. CSV files are derived backups, split by local capture date and named `GPS-<device-number>-YYYY-MM-DD.csv`. CSV generation occurs after the Room transaction and before SMTP delivery. The history screen can filter by date and share a selected daily file or a newly generated complete export through Android FileProvider.
+Room is the source of truth. Sent rows are retained as history rather than deleted. CSV files are derived backups, split by local capture date and named `GPS-<device-number>-YYYY-MM-DD.csv`. CSV generation occurs after the Room transaction and before SMTP delivery. After a successful delivery-state transaction, the app regenerates affected daily CSV files so their statuses match Room. The history screen can filter by date and share a selected daily file or a newly generated complete export through Android FileProvider.
 
 ## Email Format
 
-Each scheduled execution sends at most one message. It contains the new record and every older unsent record in one CSV attachment.
+Each scheduled execution sends at most one message. It contains the new record and the oldest unsent records that fit within a 20 MiB generated CSV attachment. Records beyond that limit remain pending for the next scheduled message. Under expected pilot volume, this limit is reached only after an unusually long outage.
 
 Subject example:
 
@@ -139,7 +140,7 @@ The following current behaviour is replaced:
 - queue logic that deletes rows after upload;
 - receiver/Quick Tunnel operational dependency.
 
-Existing installed prototype data is pilot-only. The new database migration preserves location rows where practical, assigns them a legacy/imported state, and never treats their prior server-upload status as Gmail delivery confirmation.
+Existing installed prototype data is pilot-only. The new database migration preserves remaining queued location rows where practical, marks their source as `LEGACY_IMPORT` and delivery state as `PENDING`, and never treats prior server-upload status as Gmail delivery confirmation.
 
 ## Verification And Acceptance
 
