@@ -27,7 +27,9 @@ import okhttp3.OkHttpClient
 @Suppress("DEPRECATION")
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
-    private val database = Room.databaseBuilder(appContext, AppDatabase::class.java, "tracker.db").build()
+    private val database = Room.databaseBuilder(appContext, AppDatabase::class.java, "tracker.db")
+        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .build()
     val trackingPreferences = TrackingPreferences(appContext)
     val profiles = ProfileRepository(database.profileDao(), EncryptedProfileSecrets(appContext)) { trackingPreferences.enabled }
     val queue = LocationQueueRepository(database.pendingLocationDao())
