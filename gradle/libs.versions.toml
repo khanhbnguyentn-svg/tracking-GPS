@@ -15,6 +15,7 @@ security = "1.1.0"
 junit = "4.13.2"
 json = "20250517"
 coroutines = "1.10.2"
+android-mail = "1.6.7"
 
 [libraries]
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "core" }
@@ -40,6 +41,8 @@ okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.
 junit = { module = "junit:junit", version.ref = "junit" }
 json = { module = "org.json:json", version.ref = "json" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+android-mail = { module = "com.sun.mail:android-mail", version.ref = "android-mail" }
+android-activation = { module = "com.sun.mail:android-activation", version.ref = "android-mail" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

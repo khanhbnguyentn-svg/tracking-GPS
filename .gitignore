@@ -5,6 +5,7 @@
 /.gradle/
 /.kotlin/
 /local.properties
+/gmail-secrets.properties
 /**/build/
 /.idea/
 /gps-receiver/node_modules/

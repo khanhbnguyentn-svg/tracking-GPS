@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,17 +7,30 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val gmailSecrets = Properties().apply {
+    rootProject.file("gmail-secrets.properties").takeIf { it.isFile }?.inputStream()?.use(::load)
+}
+
+fun secret(name: String): String = providers.gradleProperty(name)
+    .orElse(providers.environmentVariable(name))
+    .orNull
+    ?: gmailSecrets.getProperty(name, "")
+
+fun quoted(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 android {
     namespace = "com.internal.tracker"
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.internal.tracker"
-        minSdk = 34
+        minSdk = 29
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SMTP_USER", quoted(secret("SMTP_USER")))
+        buildConfigField("String", "SMTP_APP_PASSWORD", quoted(secret("SMTP_APP_PASSWORD")))
     }
 
     buildFeatures {
@@ -56,6 +71,8 @@ dependencies {
     implementation(libs.androidx.security)
     implementation(libs.play.services.location)
     implementation(libs.okhttp)
+    implementation(libs.android.mail)
+    implementation(libs.android.activation)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
