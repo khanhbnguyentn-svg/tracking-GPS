@@ -17,14 +17,14 @@ The pilot includes:
 - Direct Gmail SMTP delivery with a dedicated account and 16-character App Password.
 - Local Room history and daily CSV backup/export.
 - Automatic retry by including unsent records in the next scheduled email.
-- PIN-gated application access and configuration.
+- PIN-gated application access and configuration, with test-build default PIN `18758691`.
 - Permission recovery actions and schedule restoration after device reboot.
 
 The pilot does not include Traccar, the internal GPS receiver, Cloudflare Tunnel, a mail relay, OAuth, real-time tracking, or official app-store distribution.
 
 ## User Experience
 
-The first launch is an administrator provisioning session: the administrator creates a numeric PIN and completes the required settings before tracking can start. The PIN is stored as a salted password hash, never as plaintext. Every later cold app launch opens the PIN screen. One successful unlock lasts until the app process is closed. After successful entry, the main screen contains only:
+The test build uses the default administrator PIN `18758691`. The first launch is an administrator provisioning session: the administrator unlocks with that PIN and completes the required settings before tracking can start. The app contains a verifier for the default PIN rather than storing it as plaintext; a changed PIN is stored as a salted password hash. Every cold app launch opens the PIN screen. One successful unlock lasts until the app process is closed. After successful entry, the main screen contains only:
 
 - current tracking state;
 - current permission/GPS readiness;
@@ -165,5 +165,5 @@ Android lint, unit tests, and debug APK assembly must pass. Manual acceptance co
 - Room and CSV are written before SMTP; outages do not lose captured records.
 - A future successful message batches and clears the delivery backlog without deleting history.
 - Gmail App Password can be replaced and validated without rebuilding the APK.
-- Credentials and PIN are absent from repository content, logs, exports, and user-visible errors.
+- Gmail credentials and changed PIN values are absent from repository content, logs, exports, and user-visible errors. The documented test-build default PIN is intentionally public and is not treated as a security boundary.
 - The app clearly reports Android scheduling limitations and technical interruptions.
