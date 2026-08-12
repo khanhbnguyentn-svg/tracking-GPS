@@ -5,35 +5,20 @@ import android.provider.Settings
 import androidx.room.Room
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.internal.tracker.config.ConfigFileCodec
 import com.internal.tracker.config.AdminPinStore
 import com.internal.tracker.config.DeviceIdProvider
 import com.internal.tracker.config.EncryptedPilotConfigStore
 import com.internal.tracker.config.EncryptedPinPreferences
-import com.internal.tracker.config.TlsMode
 import com.internal.tracker.data.AppDatabase
 import com.internal.tracker.export.DailyCsvStore
 import com.internal.tracker.history.LocationHistoryRepository
 import com.internal.tracker.mail.GmailSmtpSender
 import com.internal.tracker.mail.ReportDelivery
-import com.internal.tracker.network.ConnectionTester
-import com.internal.tracker.network.OkHttpNetworkProbe
-import com.internal.tracker.network.OsmAndClient
-import com.internal.tracker.network.OsmAndRequestFactory
-import com.internal.tracker.network.TlsClientFactory
-import com.internal.tracker.profile.EncryptedProfileSecrets
-import com.internal.tracker.profile.Profile
-import com.internal.tracker.profile.ProfileRepository
-import com.internal.tracker.queue.LocationQueueRepository
-import com.internal.tracker.queue.LocationSample
 import com.internal.tracker.report.BatteryReader
 import com.internal.tracker.report.LocationSnapshotProvider
 import com.internal.tracker.report.ReportRun
 import com.internal.tracker.schedule.WorkManagerReportScheduler
-import com.internal.tracker.tracking.TrackingController
 import com.internal.tracker.tracking.TrackingPreferences
-import com.internal.tracker.worker.QueueUploader
-import okhttp3.OkHttpClient
 import java.time.Instant
 import java.time.ZoneId
 
@@ -46,9 +31,6 @@ class AppContainer(context: Context) {
     val trackingPreferences = TrackingPreferences(appContext)
     val pilotConfig = EncryptedPilotConfigStore(appContext)
     val adminPin = AdminPinStore(EncryptedPinPreferences(appContext))
-    val profiles = ProfileRepository(database.profileDao(), EncryptedProfileSecrets(appContext)) { trackingPreferences.enabled }
-    val queue = LocationQueueRepository(database.pendingLocationDao())
-    val configCodec = ConfigFileCodec()
 
     private val encryptedPrefs = EncryptedSharedPreferences.create(
         appContext,
@@ -63,19 +45,6 @@ class AppContainer(context: Context) {
         { encryptedPrefs.edit().putString("fallback", it).apply() },
     )
 
-    private val tls = TlsClientFactory()
-    private val requests = OsmAndRequestFactory()
-    private val clientFor: (Profile) -> OkHttpClient = { profile ->
-        when (profile.tlsMode) {
-            TlsMode.SYSTEM -> tls.system()
-            TlsMode.CUSTOM_CA -> tls.customCa(requireNotNull(profile.customCa) { "Chưa nhập Custom CA" })
-            TlsMode.PINNING -> tls.pinning(profile.host, requireNotNull(profile.certificatePin))
-        }
-    }
-    private val sender = OsmAndClient(clientFor, requests)
-    val queueUploader = QueueUploader(queue, profiles::active, deviceId::get, sender)
-    val connectionTester = ConnectionTester(OkHttpNetworkProbe(clientFor), sender)
-    val trackingController = TrackingController(appContext, trackingPreferences)
 
     val history = LocationHistoryRepository(database.locationRecordDao())
     val csv = DailyCsvStore(appContext)
@@ -133,6 +102,4 @@ class AppContainer(context: Context) {
         }
     }
 
-    @Volatile
-    var latestLocation: LocationSample? = null
 }

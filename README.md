@@ -1,53 +1,27 @@
-# Internal Traccar Tracker
+# GPS Email Pilot
 
-Ứng dụng Android 14+ lấy vị trí trong foreground service và gửi đến Traccar/OsmAnd. Kết nối được chỉnh ngay trên điện thoại hoặc nhập bằng một file JSON dùng chung. Device ID tự sinh; PIC xác nhận trên Traccar.
+Ung dung noi bo cho Android 10+, lay mot diem GPS theo lich 6h/12h/24h, luu lich su/CSV tren dien thoai va gui mot email tong hop qua Gmail SMTP.
 
-## Build trên GitHub
+## Build tren Windows
 
-1. Tạo repository trống trên GitHub, không thêm README/license.
-2. Mở Terminal tại thư mục dự án và chạy:
+Yeu cau: JDK 17, Android SDK Platform 36 va Build Tools 36.0.0.
 
-```powershell
-git remote add origin https://github.com/TEN_CUA_BAN/TEN_REPO.git
-git push -u origin main
-```
-
-3. Mở tab **Actions** trên GitHub, chọn workflow **Android** và chờ dấu xanh.
-4. Mở lần chạy mới nhất, tải artifact `traccar-tracker-debug`, giải nén và cài `app-debug.apk` lên máy test.
-
-GitHub Actions tự chạy unit test, Android lint và build APK nội bộ. Dự án không có quy trình phát hành Google Play hoặc phân phối công khai.
-
-## Build bằng Android Studio
-
-- Android Studio mới, JDK 17 và Android SDK 36.
-- Mở thư mục dự án, chờ Gradle sync, chọn **Build > Build APK(s)**.
-- APK nằm tại `app/build/outputs/apk/debug/app-debug.apk`.
-
-Hoặc chạy:
+1. Tao `gmail-secrets.properties` tai thu muc goc tu mau `docs/gmail-build-secrets.example.properties`.
+2. Dien Gmail gui rieng va App Password 16 ky tu. Khong commit file nay.
+3. Chay:
 
 ```powershell
-./gradlew.bat testDebugUnitTest lintDebug assembleDebug
+./gradlew.bat clean testDebugUnitTest lintDebug assembleDebug --no-daemon
 ```
 
-## Cấu hình điện thoại
+APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
-1. IT sửa `config/traccar-profile.example.json` thành host/port/TLS thực tế và gửi cùng một file cho mọi máy.
-2. Trong app mở **Kết nối**, chọn **Nhập JSON**, xem trước rồi xác nhận.
-3. Chọn cấu hình vừa nhập làm cấu hình hoạt động.
-4. Cấp lần lượt quyền vị trí chính xác, vị trí nền và thông báo. Khi Android chặn quyền, nút trong app mở đúng trang Settings.
-5. Nhấn **Bắt đầu theo dõi**, giữ notification foreground đang chạy.
-6. Gửi Device ID hiển thị trong app cho PIC; PIC tìm thiết bị tự đăng ký trong group chờ, đổi tên và xác nhận.
-7. Mở **Chẩn đoán**: thử server trước, sau đó thử gửi vị trí GPS thật.
+## Su dung
 
-Không tắt tối ưu pin nếu chính sách công ty không cho phép. Nếu hãng điện thoại dừng app, trạng thái/notification sẽ cho biết tracking không còn chạy; WorkManager chỉ gửi lại dữ liệu đã xếp hàng.
+1. Mo app bang PIN test mac dinh `18758691`.
+2. Trong `Cau hinh`, nhap so thiet bi `001`-`100`, email nhan, chu ky va Gmail gui.
+3. App Password de trong neu giu gia tri da luu; nhap ma moi de thay doi.
+4. Bam `Luu va kiem tra`, cap quyen vi tri nen, sau do `Bat dau theo doi`.
+5. Xem va chia se CSV tai `Lich su`.
 
-Tài liệu IT: `Huong-dan-ky-thuat-setup-Traccar-Server-noi-bo.md`  
-Checklist máy thật: `docs/android-14-device-test-checklist.md`
-
-## Web nhận GPS nội bộ
-
-Thư mục `gps-receiver/` chứa web Node.js nhận trực tiếp contract OsmAnd hiện tại và JSON POST trên cổng `5055`. Sau khi cài Windows Service, mở dashboard tại `http://localhost:5055/dashboard`; điện thoại trong cùng Wi-Fi dùng profile mẫu trong `config/traccar-profile.example.json`.
-
-Web này là môi trường LAN độc lập, không phải Traccar và không được mở port-forward ra Internet. Receiver dùng PostgreSQL/PostGIS, có đăng nhập Admin/Dispatcher và tự chạy migration trước khi mở cổng. Xem `gps-receiver/README.md` để cài đặt, kiểm thử và vận hành.
-
-Trên Windows, bộ cài mặc định đặt toàn bộ server và dữ liệu dưới `D:\InternalGPS` bằng các thành phần miễn phí/mã nguồn mở. Chạy hai installer với `-WhatIf` trước, sau đó mới chạy thật trong Windows PowerShell Administrator.
+Gio gui la khoang du kien do Android Doze co the tri hoan WorkManager. Chi tiet van hanh: `docs/periodic-gmail-pilot-handover.md`.

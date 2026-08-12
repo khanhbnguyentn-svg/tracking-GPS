@@ -38,6 +38,11 @@ android {
         buildConfig = true
     }
 
+    packaging.resources.excludes += setOf(
+        "META-INF/NOTICE.md",
+        "META-INF/LICENSE.md",
+    )
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -70,7 +75,6 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.security)
     implementation(libs.play.services.location)
-    implementation(libs.okhttp)
     implementation(libs.android.mail)
     implementation(libs.android.activation)
 
@@ -78,6 +82,5 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.json)
     testImplementation(libs.coroutines.test)
-    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.androidx.room.testing)
 }

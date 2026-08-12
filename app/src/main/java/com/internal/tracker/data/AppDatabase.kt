@@ -6,15 +6,9 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.internal.tracker.history.LocationRecord
 import com.internal.tracker.history.LocationRecordDao
-import com.internal.tracker.profile.ProfileDao
-import com.internal.tracker.profile.ProfileEntity
-import com.internal.tracker.queue.PendingLocation
-import com.internal.tracker.queue.PendingLocationDao
 
-@Database(entities = [ProfileEntity::class, PendingLocation::class, LocationRecord::class], version = 2, exportSchema = false)
+@Database(entities = [LocationRecord::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun profileDao(): ProfileDao
-    abstract fun pendingLocationDao(): PendingLocationDao
     abstract fun locationRecordDao(): LocationRecordDao
 
     companion object {
