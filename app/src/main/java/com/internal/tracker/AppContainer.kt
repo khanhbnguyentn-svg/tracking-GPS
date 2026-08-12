@@ -77,12 +77,12 @@ class AppContainer(context: Context) {
     val connectionTester = ConnectionTester(OkHttpNetworkProbe(clientFor), sender)
     val trackingController = TrackingController(appContext, trackingPreferences)
 
-    private val history = LocationHistoryRepository(database.locationRecordDao())
-    private val csv = DailyCsvStore(appContext)
-    private val gmail = GmailSmtpSender()
+    val history = LocationHistoryRepository(database.locationRecordDao())
+    val csv = DailyCsvStore(appContext)
+    val gmail = GmailSmtpSender()
     private val location = LocationSnapshotProvider(appContext)
     private val battery = BatteryReader(appContext)
-    private val reportScheduler = WorkManagerReportScheduler(appContext)
+    private val reportScheduler = WorkManagerReportScheduler(appContext) { trackingPreferences.nextRunTime = it }
     private val delivery = ReportDelivery(
         history = database.locationRecordDao(),
         config = pilotConfig::load,

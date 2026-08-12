@@ -8,7 +8,7 @@ import com.internal.tracker.report.ReportWorker
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
-class WorkManagerReportScheduler(context: Context) {
+class WorkManagerReportScheduler(context: Context, private val onScheduled: (Long) -> Unit = {}) {
     private val workManager = WorkManager.getInstance(context)
     private val scheduler = ReportScheduler(
         now = ZonedDateTime::now,
@@ -18,6 +18,7 @@ class WorkManagerReportScheduler(context: Context) {
                 .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                 .build()
             workManager.enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.REPLACE, request)
+            onScheduled(time.toInstant().toEpochMilli())
         },
         cancel = { workManager.cancelUniqueWork(UNIQUE_NAME) },
     )

@@ -27,4 +27,11 @@ class DailyCsvStore(private val context: Context) {
     }
 
     fun shareUri(file: File) = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+
+    fun writeCompleteExport(deviceNumber: String, records: List<LocationRecord>): File {
+        directory.mkdirs()
+        return File(directory, "GPS-$deviceNumber-all.csv").apply {
+            writeText(LocationCsv.encode(records), Charsets.UTF_8)
+        }
+    }
 }

@@ -24,4 +24,8 @@ class TrackingPreferences(context: Context) {
     var lastError: String?
         get() = preferences.getString("last_error", null)
         set(value) = preferences.edit().putString("last_error", value).apply()
+
+    var nextRunTime: Long
+        get() = preferences.getLong("next_run", 0)
+        set(value) = preferences.edit().putLong("next_run", value).apply()
 }
