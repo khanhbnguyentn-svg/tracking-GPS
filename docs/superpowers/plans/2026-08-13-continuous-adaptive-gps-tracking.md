@@ -38,6 +38,7 @@
 - `AppContainer.kt`: composition root và start/stop/reconcile tracking.
 - `ui/HistoryFilter.kt`: tính khoảng tháng/năm và delete labels.
 - `ui/AppUiPolicy.kt`: policy PIN/session có thể unit test.
+- `ui/StatusUiModel.kt`: các row được Status render, chủ động loại Device ID.
 - `ui/TrackerApp.kt`: dialogs, permission, History controls và screens.
 
 ---
@@ -571,28 +572,32 @@ git commit -m "feat: define protected actions and history ranges"
 
 **Files:**
 - Modify: `app/src/main/java/com/internal/tracker/ui/TrackerApp.kt`
-- Modify: `app/src/test/java/com/internal/tracker/ProjectConfigTest.kt`
+- Create: `app/src/main/java/com/internal/tracker/ui/StatusUiModel.kt`
+- Create: `app/src/test/java/com/internal/tracker/ui/StatusUiModelTest.kt`
 
 **Interfaces:**
 - Consumes: Task 4 AppContainer start/stop APIs, Task 6 policies/ranges, repository delete/oldest APIs.
 - Produces: PIN dialog workflow, optional Activity Recognition permission launcher, History dropdowns/delete dialogs.
 
-- [ ] **Step 1: Add RED source-contract tests for sensitive UI wiring**
+- [ ] **Step 1: Add RED behavior tests for Status rows**
 
-Extend `ProjectConfigTest` to read `TrackerApp.kt` and assert:
+Test the real model consumed by Compose rather than grepping source text:
 
 ```kotlin
-assertFalse(source.contains("StatusRow(\"Device ID\""))
-assertTrue(source.contains("PinVerificationDialog"))
-assertTrue(source.contains("ProtectedAction.STOP_TRACKING"))
-assertTrue(source.contains("ProtectedAction.DELETE_FILTERED"))
-assertTrue(source.contains("Xóa theo bộ lọc"))
-assertFalse(source.contains("Xóa tháng này"))
+val model = StatusUiModel.create(
+    tracking = true,
+    deviceNumber = "001",
+    lastLocationTime = 1_000,
+    lastSendTime = 2_000,
+    nextRunTime = 3_000,
+)
+assertEquals(listOf("Trạng thái", "Thiết bị", "GPS cuối", "Email cuối", "Kỳ gửi dự kiến"), model.rows.map { it.label })
+assertFalse(model.rows.any { it.label == "Device ID" })
 ```
 
-- [ ] **Step 2: Run ProjectConfigTest and verify RED**
+- [ ] **Step 2: Run StatusUiModelTest and verify RED**
 
-Run: `./gradlew.bat testDebugUnitTest --tests "com.internal.tracker.ProjectConfigTest" --no-daemon`
+Run: `./gradlew.bat testDebugUnitTest --tests "com.internal.tracker.ui.StatusUiModelTest" --no-daemon`
 
 - [ ] **Step 3: Implement reusable PIN verification dialog and Settings session unlock**
 
@@ -614,14 +619,14 @@ Delete only the Status row. Keep Settings Device ID. Add read-only text: `Giám 
 
 - [ ] **Step 7: Run UI policy/source tests and compile Compose**
 
-Run: `./gradlew.bat testDebugUnitTest --tests "com.internal.tracker.ui.*" --tests "com.internal.tracker.ProjectConfigTest" assembleDebug --no-daemon`
+Run: `./gradlew.bat testDebugUnitTest --tests "com.internal.tracker.ui.*" assembleDebug --no-daemon`
 
 Expected: tests pass and Compose compiles without experimental API or missing permission errors.
 
 - [ ] **Step 8: Commit Task 7**
 
 ```powershell
-git add app/src/main/java/com/internal/tracker/ui/TrackerApp.kt app/src/test/java/com/internal/tracker/ProjectConfigTest.kt
+git add app/src/main/java/com/internal/tracker/ui/TrackerApp.kt app/src/main/java/com/internal/tracker/ui/StatusUiModel.kt app/src/test/java/com/internal/tracker/ui/StatusUiModelTest.kt
 git commit -m "feat: secure tracking and history controls"
 ```
 
