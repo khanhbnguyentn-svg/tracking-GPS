@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 
 enum class DeliveryState { PENDING, SENT, RETRYING }
 enum class RecordSource { CURRENT, LEGACY_IMPORT }
+enum class RecordType { START, PERIODIC, TEMP_STOP, STOP }
 
 data class CapturedLocation(
     val latitude: Double,
@@ -35,4 +36,6 @@ data class LocationRecord(
     val attemptCount: Int = 0,
     val lastError: String? = null,
     val sentAt: Long? = null,
+    val recordType: RecordType = RecordType.PERIODIC,
+    val isFinalized: Boolean = true,
 )

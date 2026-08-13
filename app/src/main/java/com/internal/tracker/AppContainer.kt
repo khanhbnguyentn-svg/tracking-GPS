@@ -26,7 +26,7 @@ import java.time.ZoneId
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
     private val database = Room.databaseBuilder(appContext, AppDatabase::class.java, "tracker.db")
-        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
         .build()
     val trackingPreferences = TrackingPreferences(appContext)
     val pilotConfig = EncryptedPilotConfigStore(appContext)

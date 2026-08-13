@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.internal.tracker.history.LocationRecord
 import com.internal.tracker.history.LocationRecordDao
 
-@Database(entities = [LocationRecord::class], version = 2, exportSchema = false)
+@Database(entities = [LocationRecord::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun locationRecordDao(): LocationRecordDao
 
@@ -49,6 +49,17 @@ abstract class AppDatabase : RoomDatabase() {
                         accuracy, NULL, 0, 'LEGACY_IMPORT', 'PENDING', retryCount, NULL, NULL
                     FROM pending_locations
                     """.trimIndent(),
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE location_records ADD COLUMN recordType TEXT NOT NULL DEFAULT 'PERIODIC'",
+                )
+                db.execSQL(
+                    "ALTER TABLE location_records ADD COLUMN isFinalized INTEGER NOT NULL DEFAULT 1",
                 )
             }
         }
