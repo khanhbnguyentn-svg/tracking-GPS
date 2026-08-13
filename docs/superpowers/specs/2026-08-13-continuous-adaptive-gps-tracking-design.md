@@ -25,7 +25,7 @@ Chuyển ứng dụng từ cơ chế ReportWorker chụp một vị trí tại m
 
 `TrackingService` là foreground service loại `location`. Service được khởi động khi người dùng bật tracking và dừng khi người dùng xác nhận PIN để tắt tracking.
 
-Service đăng ký `FusedLocationProviderClient` với chu kỳ mong muốn 10 giây. Android có thể giao callback sớm hoặc muộn hơn; app xử lý timestamp thực tế của từng `Location`, không giả định callback chính xác tuyệt đối mỗi 10 giây.
+Service đăng ký `FusedLocationProviderClient` với chu kỳ mong muốn 10 giây. Khi detector ở `IDLE`, request dùng `PRIORITY_BALANCED_POWER_ACCURACY`; khi ở `MOVING` hoặc `STOP_CANDIDATE`, request chuyển sang `PRIORITY_HIGH_ACCURACY`. Android có thể giao callback sớm hoặc muộn hơn; app xử lý timestamp thực tế của từng `Location`, không giả định callback chính xác tuyệt đối mỗi 10 giây.
 
 Service chuyển mỗi vị trí sang model trung lập rồi đưa vào `MovementDetector`. Service chỉ chịu trách nhiệm lifecycle, notification, permission và ghi kết quả detector qua repository; nó không chứa logic SMTP hoặc tạo CSV.
 
