@@ -233,10 +233,22 @@ private fun StatusScreen(
     val scope = rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }
     var fineRequested by remember { mutableStateOf(false) }
-    val fine = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refresh++ }
-    val background = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
-    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
-    val activityRecognition = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
+    val fine = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val background = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val activityRecognition = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        container.reconcileTracking()
+        refresh++
+    }
     val snapshot = permissionSnapshot(activity, fineRequested, refresh)
     val action = PermissionPolicy.next(snapshot)
     val tracking = container.trackingPreferences.enabled
@@ -250,8 +262,10 @@ private fun StatusScreen(
         nextRunTime = container.trackingPreferences.nextRunTime,
         formatTime = ::formatTime,
     )
-    val activityPermissionMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-        ContextCompat.checkSelfPermission(activity, Manifest.permission.ACTIVITY_RECOGNITION) !=
+    val activityPermissionMissing = ContextCompat.checkSelfPermission(
+        activity,
+        Manifest.permission.ACTIVITY_RECOGNITION,
+    ) !=
         PackageManager.PERMISSION_GRANTED
 
     Column(

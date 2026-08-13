@@ -1,6 +1,7 @@
 package com.internal.tracker.tracking
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -36,13 +37,13 @@ class TrackingService : Service() {
     private lateinit var fusedLocation: FusedLocationProviderClient
     private lateinit var activityMonitor: VehicleActivityMonitor
     private val container get() = (application as TrackerApplication).container
-    private var currentPriority: Int? = null
-    private var started = false
+    @Volatile private var currentPriority: Int? = null
+    @Volatile private var started = false
     @Volatile private var inVehicle = false
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
-            result.locations.forEach { location -> process(location) }
+            process(result.locations)
         }
     }
 
@@ -86,7 +87,10 @@ class TrackingService : Service() {
             stopSelf()
             return
         }
-        if (started) return
+        if (started) {
+            activityMonitor.register()
+            if (currentPriority != null) return
+        }
         started = true
         scope.launch {
             processingMutex.withLock {
@@ -97,7 +101,11 @@ class TrackingService : Service() {
                     )
                     registerLocationUpdates(priorityFor(mode))
                     activityMonitor.register()
-                }.onFailure { container.trackingPreferences.lastError = ERROR_TRACKING_START_FAILED }
+                }.onFailure {
+                    started = false
+                    currentPriority = null
+                    container.trackingPreferences.lastError = ERROR_TRACKING_START_FAILED
+                }
             }
         }
     }
@@ -117,26 +125,31 @@ class TrackingService : Service() {
         }
     }
 
-    private fun process(location: Location) {
-        val fix = TrackingFix(
-            latitude = location.latitude,
-            longitude = location.longitude,
-            accuracy = location.accuracy.takeIf { location.hasAccuracy() }?.toDouble(),
-            capturedAt = location.time,
-            timezone = ZoneId.systemDefault().id,
-            speedMetersPerSecond = location.speed.takeIf { location.hasSpeed() }?.toDouble(),
-        )
+    private fun process(locations: List<Location>) {
+        val fixes = locations.sortedBy(Location::getTime).map { it.toTrackingFix() }
         scope.launch {
             processingMutex.withLock {
                 if (!container.trackingPreferences.enabled) return@withLock
-                runCatching {
-                    val mode = container.trackingCoordinator.onFix(fix, inVehicle)
-                    registerLocationUpdates(priorityFor(mode))
-                }.onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
+                fixes.forEach { fix ->
+                    runCatching {
+                        val mode = container.trackingCoordinator.onFix(fix, inVehicle)
+                        registerLocationUpdates(priorityFor(mode))
+                    }.onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
+                }
             }
         }
     }
 
+    private fun Location.toTrackingFix() = TrackingFix(
+        latitude = latitude,
+        longitude = longitude,
+        accuracy = accuracy.takeIf { hasAccuracy() }?.toDouble(),
+        capturedAt = time,
+        timezone = ZoneId.systemDefault().id,
+        speedMetersPerSecond = speed.takeIf { hasSpeed() }?.toDouble(),
+    )
+
+    @SuppressLint("MissingPermission")
     private fun registerLocationUpdates(priority: Int) {
         if (currentPriority == priority) return
         if (!hasLocationPermission()) {
@@ -151,8 +164,12 @@ class TrackingService : Service() {
             .build()
         fusedLocation.removeLocationUpdates(locationCallback)
         runCatching {
-            fusedLocation.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
             currentPriority = priority
+            fusedLocation.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+                .addOnFailureListener {
+                    currentPriority = null
+                    container.trackingPreferences.lastError = ERROR_LOCATION_UPDATES_FAILED
+                }
         }.onFailure {
             currentPriority = null
             container.trackingPreferences.lastError = ERROR_LOCATION_UPDATES_FAILED

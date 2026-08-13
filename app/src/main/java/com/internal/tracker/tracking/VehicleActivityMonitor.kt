@@ -44,6 +44,9 @@ class VehicleActivityMonitor(
     }
 
     fun unregister() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
         runCatching { client.removeActivityTransitionUpdates(pendingIntent) }
     }
 
