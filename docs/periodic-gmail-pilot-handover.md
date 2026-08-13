@@ -1,11 +1,18 @@
 # Huong dan trien khai GPS Email Pilot
 
-## 1. Pham vi
+## 1. Phạm vi
 
 - Android 10 tro len, phan phoi APK noi bo.
 - 100 thiet bi, danh so `001` den `100`; Device ID tu dong khong thay doi.
 - Lich `6h`, `12h`, `24h`, neo gan 00:00 va dan deu trong 59 phut.
 - Khong can Traccar, webserver, Cloudflare Tunnel hoac may tinh chay lien tuc.
+
+Ứng dụng tách thành hai luồng độc lập:
+
+- `TrackingService` chạy foreground khi tracking bật, quan sát GPS khoảng mỗi 10 giây và lưu sự kiện hành trình vào Room.
+- `ReportWorker` chạy theo lịch 6h/12h/24h, gom các record đã hoàn tất nhưng chưa gửi vào một CSV và gửi một email duy nhất.
+
+Khi xe đang chạy, app lưu `PERIODIC` mỗi 2 phút, đồng thời lưu `START`, `TEMP_STOP` và `STOP`. Điểm bắt đầu dừng được tạo ngay dưới dạng `TEMP_STOP` chưa hoàn tất; nếu xe chạy lại trước 2 phút, record được hoàn tất dưới dạng `TEMP_STOP`; nếu đứng yên đủ 2 phút, cùng record đó được nâng cấp thành `STOP`.
 
 ## 2. Chuan bi Gmail
 
@@ -45,29 +52,54 @@ GitHub Actions cung build artifact `gps-email-pilot-debug`, nhung may tinh khong
 1. Cai APK va mo bang PIN `18758691`.
 2. Mo `Cau hinh`, nhap so thiet bi duy nhat, email nhan va chu ky.
 3. Bam `Luu va kiem tra`. Neu App Password build san con dung, co the de trong o ma moi.
-4. Cap vi tri chinh xac, `Luon cho phep` vi tri nen va thong bao khi duoc hoi.
-5. Neu nut `Cap quyen thiet bi` mo Settings, chon quyen con thieu roi quay lai app.
-6. Bam `Bat dau theo doi`.
+4. Cấp vị trí chính xác, `Luôn cho phép` vị trí nền và thông báo khi được hỏi.
+5. Có thể cấp thêm quyền Nhận diện hoạt động để hỗ trợ nhận biết `IN_VEHICLE`. Nếu từ chối hoặc thiết bị không hỗ trợ, app vẫn theo dõi bằng tốc độ và khoảng cách GPS.
+6. Nếu nút `Cấp quyền thiết bị` mở Settings, chọn quyền còn thiếu rồi quay lại app.
+7. Bấm `Bắt đầu theo dõi` và xác nhận thông báo foreground `Đang theo dõi vị trí` xuất hiện.
 
 Khong tat pin/toi uu nen cho app neu nha san xuat dien thoai co tuy chon rieng. WorkManager phuc hoi sau reboot, nhung Android/firmware co the tri hoan hoac dung tac vu; app hien thoi diem GPS/email cuoi va loi ky thuat gan nhat.
 
-## 5. Du lieu va mat song
+## 5. Dữ liệu và mất sóng
 
-Moi lan chay, app ghi Room va CSV truoc khi thu gui. Khi mat mang, record giu `RETRYING`; ky sau gom backlog vao mot file CSV va gui mot email. Ban ghi `SENT` van duoc giu trong lich su.
+Foreground service ghi Room liên tục, không gửi email ngay. Khi đến kỳ, worker xóa record cũ hơn một năm, lấy các record đã hoàn tất chưa gửi, tạo một CSV và gửi một email. Khi mất mạng, record giữ `RETRYING`; kỳ sau tiếp tục gom backlog. Bản ghi `SENT` vẫn được giữ trong lịch sử cho tới khi bị xóa thủ công hoặc quá thời hạn lưu giữ.
 
-Tai man `Lich su`, bam `Xuat toan bo CSV` de chia se ket qua test ma khong can webserver. File chi gom Device ID/so thiet bi, thoi gian, toa do, sai so GPS, pin, thoi gian theo doi va trang thai gui.
+CSV gồm Device ID/số thiết bị, thời gian, tọa độ, sai số GPS, pin, thời gian theo dõi, trạng thái gửi và `record_type`. Record `TEMP_STOP` chưa hoàn tất không được đưa vào email.
 
-## 6. Doi credential
+Tại màn `Lịch sử`:
+
+- Chọn `Năm` và `Tháng` để xem hoặc xuất đúng phạm vi.
+- Chọn tháng khi năm đang là `Tất cả` sẽ tự chọn năm hiện tại.
+- `Xóa theo bộ lọc` chỉ bật khi đã chọn năm; nó xóa đúng năm hoặc tháng đang chọn.
+- `Xóa tất cả` xóa toàn bộ database.
+- Mỗi thao tác xóa đều yêu cầu xác nhận phạm vi, sau đó nhập PIN.
+
+Màn Status không hiển thị Device ID. Device ID vẫn có trong Cấu hình, Room và CSV.
+
+## 6. Bảo vệ bằng PIN
+
+- App yêu cầu PIN ở lần mở đầu tiên.
+- Status và Lịch sử chỉ đọc, không hỏi lại PIN sau khi app đã mở khóa.
+- Cấu hình yêu cầu PIN ở lần truy cập đầu tiên trong mỗi phiên.
+- Dừng tracking luôn yêu cầu PIN riêng.
+- Xóa theo bộ lọc và xóa tất cả luôn yêu cầu xác nhận rồi nhập PIN riêng.
+
+## 7. Đổi credential
 
 1. Tao App Password moi trong Gmail.
 2. Mo app, nhap PIN, vao `Cau hinh`.
 3. Dan ma 16 ky tu vao o App Password va bam `Luu va kiem tra`.
 4. App chi thay credential cu sau khi Gmail chap nhan dang nhap.
 
-## 7. Kiem thu con phai lam tren thiet bi
+## 8. Kiểm thử còn phải làm trên thiết bị
 
 - Android 10, 12, 14+.
 - Reboot va doi mui gio.
+- Xác nhận callback GPS khoảng 10 giây và thay đổi BALANCED/HIGH accuracy theo trạng thái.
+- Chạy xe để kiểm tra `START`, `PERIODIC` sau 2 phút, `TEMP_STOP` dưới 2 phút và `STOP` từ 2 phút.
+- Từ chối quyền Nhận diện hoạt động và xác nhận fallback GPS vẫn ghi dữ liệu.
+- Dừng tracking, mở Cấu hình và xóa dữ liệu để xác nhận đúng các dialog PIN.
+- Lọc/xóa qua biên tháng 12 sang tháng 1 theo múi giờ thiết bị.
+- Giữ dữ liệu cũ hơn một năm trong bản test rồi chạy báo cáo để xác nhận retention.
 - GPS tat/quyen bi thu hoi.
 - Doze va toi uu pin cua nha san xuat.
 - Mat mang, tao backlog, sau do co mang lai.
