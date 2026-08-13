@@ -6,7 +6,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 object LocationCsv {
-    private const val HEADER = "record_number,device_number,device_id,captured_at,timezone,latitude,longitude,accuracy_m,battery_percent,tracked_duration,delivery_state"
+    private const val HEADER = "record_number,device_number,device_id,captured_at,timezone,latitude,longitude,accuracy_m,battery_percent,tracked_duration,delivery_state,record_type"
 
     fun encode(records: List<LocationRecord>): String = buildString {
         append(HEADER).append("\r\n")
@@ -26,6 +26,7 @@ object LocationCsv {
                     record.batteryPercent ?: "",
                     formatDuration(record.trackedDurationMillis),
                     record.state.name.lowercase(),
+                    record.recordType.name,
                 ).joinToString(",") { escape(it.toString()) },
             )
             append("\r\n")

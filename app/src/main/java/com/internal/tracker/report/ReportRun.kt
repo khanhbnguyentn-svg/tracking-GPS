@@ -1,29 +1,30 @@
 package com.internal.tracker.report
 
-import com.internal.tracker.history.CapturedLocation
 import com.internal.tracker.mail.DeliveryOutcome
 
-data class ReportRunResult(val recordId: Long?, val sent: Int, val error: String?)
+data class ReportRunResult(val sent: Int, val error: String?)
 
 class ReportRun(
-    private val capture: suspend () -> CapturedLocation,
-    private val persist: suspend (CapturedLocation, Int?) -> Long,
-    private val backup: suspend (Long) -> Unit,
+    private val cleanup: suspend () -> Unit,
     private val deliver: suspend () -> DeliveryOutcome,
-    private val batteryPercent: () -> Int?,
     private val scheduleNext: () -> Unit,
 ) {
     suspend fun execute(): ReportRunResult {
+        val cleanupFailure = runCatching { cleanup() }.exceptionOrNull()
         return try {
-            val location = capture()
-            val id = persist(location, batteryPercent())
-            backup(id)
-            val delivery = deliver()
-            ReportRunResult(id, delivery.sent, delivery.publicError)
-        } catch (error: Exception) {
-            ReportRunResult(null, 0, error.message ?: "UNKNOWN")
+            runCatching { deliver() }.fold(
+                onSuccess = { delivery ->
+                    ReportRunResult(
+                        sent = delivery.sent,
+                        error = delivery.publicError ?: cleanupFailure?.publicMessage(),
+                    )
+                },
+                onFailure = { error -> ReportRunResult(0, error.publicMessage()) },
+            )
         } finally {
             scheduleNext()
         }
     }
+
+    private fun Throwable.publicMessage(): String = message ?: "UNKNOWN"
 }

@@ -1,66 +1,53 @@
 package com.internal.tracker.report
 
-import com.internal.tracker.history.CapturedLocation
 import com.internal.tracker.mail.DeliveryOutcome
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReportRunTest {
     @Test
-    fun captureIsPersistedAndBackedUpBeforeMail() = runTest {
+    fun cleanupRunsBeforeDeliveryAndSchedule() = runTest {
         val events = mutableListOf<String>()
         val run = ReportRun(
-            capture = { events += "capture"; location() },
-            persist = { _, _ -> events += "room"; 7L },
-            backup = { events += "csv" },
-            deliver = { events += "mail"; events += "sent"; events += "csv"; DeliveryOutcome(1, 0, null) },
-            batteryPercent = { 82 },
+            cleanup = { events += "cleanup" },
+            deliver = { events += "mail"; DeliveryOutcome(3, 0, null) },
+            scheduleNext = { events += "schedule" },
+        )
+
+        assertEquals(3, run.execute().sent)
+        assertEquals(listOf("cleanup", "mail", "schedule"), events)
+    }
+
+    @Test
+    fun cleanupFailureDoesNotPreventDelivery() = runTest {
+        val events = mutableListOf<String>()
+        val run = ReportRun(
+            cleanup = { events += "cleanup"; error("CLEANUP_FAILED") },
+            deliver = { events += "mail"; DeliveryOutcome(2, 0, null) },
             scheduleNext = { events += "schedule" },
         )
 
         val result = run.execute()
 
-        assertEquals(listOf("capture", "room", "csv", "mail", "sent", "csv", "schedule"), events)
-        assertEquals(7L, result.recordId)
+        assertEquals(2, result.sent)
+        assertEquals("CLEANUP_FAILED", result.error)
+        assertEquals(listOf("cleanup", "mail", "schedule"), events)
     }
 
     @Test
-    fun offlineRunStillCapturesAndSchedulesNextAnchor() = runTest {
-        var scheduled = false
+    fun deliveryErrorWinsOverCleanupErrorAndStillSchedules() = runTest {
+        val events = mutableListOf<String>()
         val run = ReportRun(
-            capture = ::location,
-            persist = { _, _ -> 7L },
-            backup = {},
-            deliver = { DeliveryOutcome(0, 1, "NETWORK") },
-            batteryPercent = { 50 },
-            scheduleNext = { scheduled = true },
+            cleanup = { events += "cleanup"; error("CLEANUP_FAILED") },
+            deliver = { events += "mail"; error("MAIL_FAILED") },
+            scheduleNext = { events += "schedule" },
         )
 
         val result = run.execute()
 
-        assertEquals("NETWORK", result.error)
-        assertTrue(scheduled)
+        assertEquals(0, result.sent)
+        assertEquals("MAIL_FAILED", result.error)
+        assertEquals(listOf("cleanup", "mail", "schedule"), events)
     }
-
-    @Test
-    fun captureFailureStillSchedulesNextAnchor() = runTest {
-        var scheduled = false
-        val run = ReportRun(
-            capture = { error("LOCATION_TIMEOUT") },
-            persist = { _, _ -> error("unused") },
-            backup = {},
-            deliver = { error("unused") },
-            batteryPercent = { 50 },
-            scheduleNext = { scheduled = true },
-        )
-
-        val result = run.execute()
-
-        assertEquals("LOCATION_TIMEOUT", result.error)
-        assertTrue(scheduled)
-    }
-
-    private fun location() = CapturedLocation(10.0, 20.0, 4.5, 1_000, "Asia/Ho_Chi_Minh")
 }

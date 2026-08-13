@@ -17,7 +17,6 @@ import com.internal.tracker.history.LocationHistoryRepository
 import com.internal.tracker.mail.GmailSmtpSender
 import com.internal.tracker.mail.ReportDelivery
 import com.internal.tracker.report.BatteryReader
-import com.internal.tracker.report.LocationSnapshotProvider
 import com.internal.tracker.report.ReportRun
 import com.internal.tracker.schedule.WorkManagerReportScheduler
 import com.internal.tracker.schedule.ReconcileAction
@@ -29,6 +28,7 @@ import com.internal.tracker.tracking.TrackingFix
 import com.internal.tracker.tracking.TrackingPreferences
 import com.internal.tracker.tracking.TrackingService
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 @Suppress("DEPRECATION")
@@ -58,7 +58,6 @@ class AppContainer(context: Context) {
     val history = LocationHistoryRepository(database.locationRecordDao())
     val csv = DailyCsvStore(appContext)
     val gmail = GmailSmtpSender()
-    private val location = LocationSnapshotProvider(appContext)
     private val battery = BatteryReader(appContext)
     private val reportScheduler = WorkManagerReportScheduler(appContext) { trackingPreferences.nextRunTime = it }
     val trackingCoordinator = TrackingCoordinator(
@@ -75,21 +74,8 @@ class AppContainer(context: Context) {
         refreshBackup = ::refreshBackups,
     )
     val reportRun = ReportRun(
-        capture = location::capture,
-        persist = { captured, batteryPercent ->
-            val config = pilotConfig.load()
-            val id = history.capture(
-                captured,
-                batteryPercent,
-                (captured.capturedAt - trackingPreferences.startedAt).coerceAtLeast(0),
-                config.deviceNumber,
-                deviceId.get(),
-            )
-            trackingPreferences.lastLocationTime = captured.capturedAt
-            id
-        },
-        backup = { id ->
-            history.get(id)?.let { refreshBackups(listOf(it)) }
+        cleanup = {
+            history.deleteOlderThan(LocalDate.now(ZoneId.systemDefault()).minusYears(1))
         },
         deliver = {
             delivery.deliverPending().also { outcome ->
@@ -97,7 +83,6 @@ class AppContainer(context: Context) {
                 if (outcome.sent > 0) trackingPreferences.lastSendTime = System.currentTimeMillis()
             }
         },
-        batteryPercent = battery::percent,
         scheduleNext = ::reconcileSchedule,
     )
 

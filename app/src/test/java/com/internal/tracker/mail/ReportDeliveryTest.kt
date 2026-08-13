@@ -38,6 +38,23 @@ class ReportDeliveryTest {
         assertEquals(1, store.unsent(10).size)
     }
 
+    @Test
+    fun unfinishedCandidateIsNotEmailedOrMarkedSent() = runTest {
+        val store = FakeMailHistoryStore(
+            listOf(
+                record(1),
+                record(2).copy(recordType = RecordType.TEMP_STOP, isFinalized = false),
+            ),
+        )
+        val sender = FakeMailSender(MailResult.Accepted)
+
+        delivery(store, sender).deliverPending()
+
+        assertEquals(listOf(1L), sender.messages.single().recordIds)
+        assertEquals(DeliveryState.SENT, store.get(1)!!.state)
+        assertEquals(DeliveryState.PENDING, store.get(2)!!.state)
+    }
+
     private fun delivery(store: LocationRecordStore, sender: FakeMailSender) = ReportDelivery(
         history = store,
         config = { PilotConfig("001", "pic@example.com", 6, "sender@gmail.com", "abcdefghijklmnop") },
