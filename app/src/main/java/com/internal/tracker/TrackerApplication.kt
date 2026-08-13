@@ -8,5 +8,5 @@ import com.internal.tracker.schedule.ScheduleOwner
 class TrackerApplication : Application(), ReportRunOwner, ScheduleOwner {
     val container by lazy { AppContainer(this) }
     override val reportRun: ReportRun get() = container.reportRun
-    override fun reconcileSchedule() = container.reconcileSchedule()
+    override fun reconcileBackgroundWork() = container.reconcileBackgroundWork()
 }

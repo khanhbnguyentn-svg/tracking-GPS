@@ -1,7 +1,9 @@
 package com.internal.tracker
 
 import android.content.Context
+import android.content.Intent
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import androidx.room.Room
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -18,7 +20,14 @@ import com.internal.tracker.report.BatteryReader
 import com.internal.tracker.report.LocationSnapshotProvider
 import com.internal.tracker.report.ReportRun
 import com.internal.tracker.schedule.WorkManagerReportScheduler
+import com.internal.tracker.schedule.ReconcileAction
+import com.internal.tracker.schedule.ScheduleReceiverPolicy
+import com.internal.tracker.history.RecordType
+import com.internal.tracker.tracking.MovementDetector
+import com.internal.tracker.tracking.TrackingCoordinator
+import com.internal.tracker.tracking.TrackingFix
 import com.internal.tracker.tracking.TrackingPreferences
+import com.internal.tracker.tracking.TrackingService
 import java.time.Instant
 import java.time.ZoneId
 
@@ -52,6 +61,12 @@ class AppContainer(context: Context) {
     private val location = LocationSnapshotProvider(appContext)
     private val battery = BatteryReader(appContext)
     private val reportScheduler = WorkManagerReportScheduler(appContext) { trackingPreferences.nextRunTime = it }
+    val trackingCoordinator = TrackingCoordinator(
+        history = history,
+        detector = MovementDetector(),
+        persist = ::persistTrackingEvent,
+        onPersisted = { trackingPreferences.lastLocationTime = it.capturedAt },
+    )
     private val delivery = ReportDelivery(
         history = database.locationRecordDao(),
         config = pilotConfig::load,
@@ -89,6 +104,68 @@ class AppContainer(context: Context) {
     fun reconcileSchedule() {
         val config = pilotConfig.load()
         reportScheduler.reconcile(trackingPreferences.enabled, config.intervalHours, config.deviceNumber.toIntOrNull() ?: 1)
+    }
+
+    fun startTracking() {
+        if (!trackingPreferences.enabled) {
+            trackingPreferences.startedAt = System.currentTimeMillis()
+            trackingPreferences.enabled = true
+        }
+        ContextCompat.startForegroundService(
+            appContext,
+            Intent(appContext, TrackingService::class.java).setAction(TrackingService.ACTION_START),
+        )
+        reconcileSchedule()
+    }
+
+    suspend fun stopTracking() {
+        trackingPreferences.enabled = false
+        trackingCoordinator.stop()
+        appContext.stopService(Intent(appContext, TrackingService::class.java))
+        reconcileSchedule()
+    }
+
+    fun reconcileTracking() {
+        if (trackingPreferences.enabled) {
+            ContextCompat.startForegroundService(
+                appContext,
+                Intent(appContext, TrackingService::class.java).setAction(TrackingService.ACTION_START),
+            )
+        }
+    }
+
+    fun reconcileBackgroundWork() {
+        ScheduleReceiverPolicy.actions(trackingPreferences.enabled).forEach { action ->
+            when (action) {
+                ReconcileAction.TRACKING -> reconcileTracking()
+                ReconcileAction.SCHEDULE -> reconcileSchedule()
+            }
+        }
+    }
+
+    suspend fun persistTrackingEvent(
+        fix: TrackingFix,
+        type: RecordType,
+        finalized: Boolean,
+    ): Long {
+        val config = pilotConfig.load()
+        val id = history.capture(
+            location = com.internal.tracker.history.CapturedLocation(
+                latitude = fix.latitude,
+                longitude = fix.longitude,
+                accuracy = fix.accuracy,
+                capturedAt = fix.capturedAt,
+                timezone = fix.timezone,
+            ),
+            batteryPercent = battery.percent(),
+            trackedMillis = (fix.capturedAt - trackingPreferences.startedAt).coerceAtLeast(0),
+            deviceNumber = config.deviceNumber,
+            deviceId = deviceId.get(),
+            recordType = type,
+            isFinalized = finalized,
+        )
+        history.get(id)?.let { refreshBackups(listOf(it)) }
+        return id
     }
 
     private suspend fun refreshBackups(records: List<com.internal.tracker.history.LocationRecord>) {

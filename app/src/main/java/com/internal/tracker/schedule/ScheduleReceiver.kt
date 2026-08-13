@@ -4,14 +4,19 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
+enum class ReconcileAction { TRACKING, SCHEDULE }
+
 object ScheduleReceiverPolicy {
-    fun shouldReconcile(trackingEnabled: Boolean) = trackingEnabled
+    fun actions(trackingEnabled: Boolean): Set<ReconcileAction> = buildSet {
+        if (trackingEnabled) add(ReconcileAction.TRACKING)
+        add(ReconcileAction.SCHEDULE)
+    }
 }
 
-interface ScheduleOwner { fun reconcileSchedule() }
+interface ScheduleOwner { fun reconcileBackgroundWork() }
 
 class ScheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        (context.applicationContext as? ScheduleOwner)?.reconcileSchedule()
+        (context.applicationContext as? ScheduleOwner)?.reconcileBackgroundWork()
     }
 }

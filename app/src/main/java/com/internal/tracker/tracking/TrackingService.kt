@@ -1,0 +1,211 @@
+package com.internal.tracker.tracking
+
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.os.IBinder
+import android.os.Looper
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.internal.tracker.MainActivity
+import com.internal.tracker.R
+import com.internal.tracker.TrackerApplication
+import java.time.ZoneId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+class TrackingService : Service() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val processingMutex = Mutex()
+    private lateinit var fusedLocation: FusedLocationProviderClient
+    private lateinit var activityMonitor: VehicleActivityMonitor
+    private val container get() = (application as TrackerApplication).container
+    private var currentPriority: Int? = null
+    private var started = false
+    @Volatile private var inVehicle = false
+
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            result.locations.forEach { location -> process(location) }
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        fusedLocation = LocationServices.getFusedLocationProviderClient(this)
+        activityMonitor = VehicleActivityMonitor(this) { error ->
+            container.trackingPreferences.lastError = error
+        }
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, notification())
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action ?: ACTION_START) {
+            ACTION_STOP -> stopTracking()
+            ACTION_VEHICLE_ENTER -> {
+                inVehicle = true
+                startTrackingIfEnabled()
+            }
+            ACTION_VEHICLE_EXIT -> {
+                inVehicle = false
+                startTrackingIfEnabled()
+            }
+            else -> startTrackingIfEnabled()
+        }
+        return START_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        fusedLocation.removeLocationUpdates(locationCallback)
+        activityMonitor.unregister()
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    private fun startTrackingIfEnabled() {
+        if (!container.trackingPreferences.enabled) {
+            stopSelf()
+            return
+        }
+        if (started) return
+        started = true
+        scope.launch {
+            processingMutex.withLock {
+                if (!container.trackingPreferences.enabled) return@withLock
+                runCatching {
+                    val mode = container.trackingCoordinator.restore(
+                        container.trackingPreferences.startedAt,
+                    )
+                    registerLocationUpdates(priorityFor(mode))
+                    activityMonitor.register()
+                }.onFailure { container.trackingPreferences.lastError = ERROR_TRACKING_START_FAILED }
+            }
+        }
+    }
+
+    private fun stopTracking() {
+        scope.launch {
+            processingMutex.withLock {
+                runCatching { container.trackingCoordinator.stop() }
+                    .onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
+                fusedLocation.removeLocationUpdates(locationCallback)
+                activityMonitor.unregister()
+                currentPriority = null
+                started = false
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }
+    }
+
+    private fun process(location: Location) {
+        val fix = TrackingFix(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracy = location.accuracy.takeIf { location.hasAccuracy() }?.toDouble(),
+            capturedAt = location.time,
+            timezone = ZoneId.systemDefault().id,
+            speedMetersPerSecond = location.speed.takeIf { location.hasSpeed() }?.toDouble(),
+        )
+        scope.launch {
+            processingMutex.withLock {
+                if (!container.trackingPreferences.enabled) return@withLock
+                runCatching {
+                    val mode = container.trackingCoordinator.onFix(fix, inVehicle)
+                    registerLocationUpdates(priorityFor(mode))
+                }.onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
+            }
+        }
+    }
+
+    private fun registerLocationUpdates(priority: Int) {
+        if (currentPriority == priority) return
+        if (!hasLocationPermission()) {
+            container.trackingPreferences.lastError = ERROR_LOCATION_PERMISSION_MISSING
+            fusedLocation.removeLocationUpdates(locationCallback)
+            currentPriority = null
+            return
+        }
+
+        val request = LocationRequest.Builder(priority, LOCATION_INTERVAL_MILLIS)
+            .setMinUpdateIntervalMillis(LOCATION_INTERVAL_MILLIS)
+            .build()
+        fusedLocation.removeLocationUpdates(locationCallback)
+        runCatching {
+            fusedLocation.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+            currentPriority = priority
+        }.onFailure {
+            currentPriority = null
+            container.trackingPreferences.lastError = ERROR_LOCATION_UPDATES_FAILED
+        }
+    }
+
+    private fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun priorityFor(mode: MovementMode): Int = when (mode) {
+        MovementMode.IDLE -> Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        MovementMode.MOVING, MovementMode.STOP_CANDIDATE -> Priority.PRIORITY_HIGH_ACCURACY
+    }
+
+    private fun createNotificationChannel() {
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Theo dõi GPS",
+                NotificationManager.IMPORTANCE_LOW,
+            ),
+        )
+    }
+
+    private fun notification() = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+        .setContentTitle(getString(R.string.app_name))
+        .setContentText("Đang theo dõi vị trí")
+        .setOngoing(true)
+        .setContentIntent(
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            ),
+        )
+        .build()
+
+    companion object {
+        const val ACTION_START = "com.internal.tracker.tracking.START"
+        const val ACTION_STOP = "com.internal.tracker.tracking.STOP"
+        const val ACTION_VEHICLE_ENTER = "com.internal.tracker.tracking.VEHICLE_ENTER"
+        const val ACTION_VEHICLE_EXIT = "com.internal.tracker.tracking.VEHICLE_EXIT"
+        const val LOCATION_INTERVAL_MILLIS = 10_000L
+        const val ERROR_LOCATION_PERMISSION_MISSING = "LOCATION_PERMISSION_MISSING"
+        const val ERROR_LOCATION_UPDATES_FAILED = "LOCATION_UPDATES_FAILED"
+        const val ERROR_TRACKING_START_FAILED = "TRACKING_START_FAILED"
+        const val ERROR_PERSIST_FAILED = "TRACKING_PERSIST_FAILED"
+        private const val NOTIFICATION_CHANNEL_ID = "continuous_tracking"
+        private const val NOTIFICATION_ID = 701
+    }
+}
