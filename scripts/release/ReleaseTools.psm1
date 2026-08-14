@@ -270,5 +270,49 @@ function Assert-ApkIdentity {
     return $identity
 }
 
+function Publish-VerifiedApk {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$AaptPath,
+        [Parameter(Mandatory)][string]$ApkSignerPath,
+        [Parameter(Mandatory)][string]$SourceApkPath,
+        [Parameter(Mandatory)][string]$OutputDirectory,
+        [Parameter(Mandatory)][string]$ExpectedPackage,
+        [Parameter(Mandatory)][string]$ExpectedVersionCode,
+        [Parameter(Mandatory)][string]$ExpectedVersionName,
+        [Parameter(Mandatory)][string]$ExpectedFingerprint
+    )
+
+    $identity = Assert-ApkIdentity -AaptPath $AaptPath -ApkSignerPath $ApkSignerPath `
+        -ApkPath $SourceApkPath -ExpectedPackage $ExpectedPackage `
+        -ExpectedVersionCode $ExpectedVersionCode -ExpectedVersionName $ExpectedVersionName `
+        -ExpectedFingerprint $ExpectedFingerprint
+
+    $destinationPath = Join-Path $OutputDirectory ("tracking-gps-{0}.apk" -f $identity.VersionName)
+    $partialPath = "$destinationPath.partial"
+    if (Test-Path -LiteralPath $destinationPath) {
+        throw "Release APK already exists for version $($identity.VersionName): $destinationPath"
+    }
+    if (-not (Test-Path -LiteralPath $OutputDirectory -PathType Container)) {
+        New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
+    }
+    try {
+        Remove-Item -LiteralPath $partialPath -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath $SourceApkPath -Destination $partialPath
+        Move-Item -LiteralPath $partialPath -Destination $destinationPath
+    } finally {
+        Remove-Item -LiteralPath $partialPath -Force -ErrorAction SilentlyContinue
+    }
+
+    return [PSCustomObject]@{
+        ApkPath = $destinationPath
+        PackageName = $identity.PackageName
+        VersionCode = $identity.VersionCode
+        VersionName = $identity.VersionName
+        Fingerprint = $identity.Fingerprint
+    }
+}
+
 Export-ModuleMember -Function Normalize-Fingerprint, New-ReleasePassword, `
-    Get-KeyStoreFingerprint, Initialize-ReleaseSigning, Get-ApkIdentity, Assert-ApkIdentity
+    Get-KeyStoreFingerprint, Initialize-ReleaseSigning, Get-ApkIdentity, Assert-ApkIdentity, `
+    Publish-VerifiedApk

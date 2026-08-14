@@ -115,6 +115,55 @@ Describe 'APK release identity' {
             -ExpectedVersionName $env:TEST_EXPECTED_VERSION_NAME `
             -ExpectedFingerprint $env:TEST_EXPECTED_FINGERPRINT } | Should Not Throw
     }
+
+    It 'does not promote an APK when release identity verification fails' {
+        if ([string]::IsNullOrWhiteSpace($env:TEST_RELEASE_APK)) {
+            Set-TestInconclusive 'TEST_RELEASE_APK is not set.'
+            return
+        }
+        $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $buildTools = Get-ChildItem (Join-Path $projectRoot '.tools\android-sdk\build-tools') -Directory |
+            Sort-Object Name -Descending | Select-Object -First 1
+        $outputDirectory = Join-Path $TestDrive 'rejected-dist'
+
+        $message = $null
+        try {
+            Publish-VerifiedApk -AaptPath (Join-Path $buildTools.FullName 'aapt.exe') `
+                -ApkSignerPath (Join-Path $buildTools.FullName 'apksigner.bat') `
+                -SourceApkPath $env:TEST_RELEASE_APK -OutputDirectory $outputDirectory `
+                -ExpectedPackage $env:TEST_EXPECTED_PACKAGE `
+                -ExpectedVersionCode $env:TEST_EXPECTED_VERSION_CODE `
+                -ExpectedVersionName $env:TEST_EXPECTED_VERSION_NAME -ExpectedFingerprint ('0' * 64)
+        } catch {
+            $message = $_.Exception.Message
+        }
+
+        $message | Should Match 'fingerprint mismatch'
+        Test-Path (Join-Path $outputDirectory 'tracking-gps-2.0.0.apk') | Should Be $false
+    }
+
+    It 'atomically promotes a verified APK using its version name' {
+        if ([string]::IsNullOrWhiteSpace($env:TEST_RELEASE_APK)) {
+            Set-TestInconclusive 'TEST_RELEASE_APK is not set.'
+            return
+        }
+        $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $buildTools = Get-ChildItem (Join-Path $projectRoot '.tools\android-sdk\build-tools') -Directory |
+            Sort-Object Name -Descending | Select-Object -First 1
+        $outputDirectory = Join-Path $TestDrive 'accepted-dist'
+
+        $result = Publish-VerifiedApk -AaptPath (Join-Path $buildTools.FullName 'aapt.exe') `
+            -ApkSignerPath (Join-Path $buildTools.FullName 'apksigner.bat') `
+            -SourceApkPath $env:TEST_RELEASE_APK -OutputDirectory $outputDirectory `
+            -ExpectedPackage $env:TEST_EXPECTED_PACKAGE `
+            -ExpectedVersionCode $env:TEST_EXPECTED_VERSION_CODE `
+            -ExpectedVersionName $env:TEST_EXPECTED_VERSION_NAME `
+            -ExpectedFingerprint $env:TEST_EXPECTED_FINGERPRINT
+
+        $result.ApkPath | Should Be (Join-Path $outputDirectory 'tracking-gps-2.0.0.apk')
+        Test-Path $result.ApkPath | Should Be $true
+        @(Get-ChildItem $outputDirectory -File).Count | Should Be 1
+    }
 }
 
 Describe 'Release signing preparation command' {
