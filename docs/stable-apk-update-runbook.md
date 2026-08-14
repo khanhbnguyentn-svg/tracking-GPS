@@ -3,8 +3,8 @@
 ## Danh tính bản phát hành
 
 - Package: `com.internal.tracker`
-- Bản hiện tại: `2.0.0 (2)`
-- APK phân phối: `dist/tracking-gps-2.0.0.apk`
+- Bản hiện tại: `2.0.1 (3)`
+- APK phân phối: `dist/tracking-gps-2.0.1.apk`
 - Certificate SHA-256: `8F:19:12:A3:4E:D2:CB:9D:DF:88:40:DB:49:A7:69:13:42:51:B3:29:74:84:33:36:78:E2:C6:79:CA:E4:F5:85`
 
 Chỉ APK có đúng package, version tăng dần và certificate trên mới được dùng để cập nhật các điện thoại hiện có. Debug APK hoặc artifact từ GitHub Actions chỉ phục vụ kiểm thử, không phải bản phân phối.
@@ -48,13 +48,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-
 Script chạy unit tests, lint, release build, xác minh package/version/chữ ký rồi mới tạo:
 
 ```text
-dist/tracking-gps-2.0.0.apk
+dist/tracking-gps-2.0.1.apk
 ```
 
 Nếu file cùng version đã tồn tại, script dừng để tránh phát hành lại một `versionCode` với nội dung khác. Sau khi bàn giao, lưu thêm SHA-256 của chính file APK:
 
 ```powershell
-Get-FileHash .\dist\tracking-gps-2.0.0.apk -Algorithm SHA256
+Get-FileHash .\dist\tracking-gps-2.0.1.apk -Algorithm SHA256
 ```
 
 Mỗi APK đã phân phối phải tăng `versionCode` ít nhất 1. `versionName` dùng `MAJOR.MINOR.PATCH`. Không dùng downgrade vì database không có migration ngược.
@@ -72,7 +72,7 @@ Mỗi APK đã phân phối phải tăng `versionCode` ít nhất 1. `versionNam
 ### ADB
 
 ```powershell
-adb install -r .\dist\tracking-gps-2.0.0.apk
+adb install -r .\dist\tracking-gps-2.0.1.apk
 ```
 
 Không dùng `-d`, không chạy `adb uninstall` và không xóa package data.
@@ -82,9 +82,11 @@ Không dùng `-d`, không chạy `adb uninstall` và không xóa package data.
 - `UPDATE_INCOMPATIBLE` hoặc xung đột chữ ký: dừng cài đặt, đối chiếu certificate fingerprint của APK cũ/mới. Không gỡ app trước khi đánh giá và sao lưu dữ liệu.
 - Version downgrade: build versionCode mới cao hơn; không ép downgrade.
 - Thiếu/sai signing properties: khôi phục đúng cặp file backup; không tạo keystore mới.
+- Thiếu/sai Gmail mặc định khi build release: tạo file bỏ qua bởi Git `gmail-secrets.properties` với Gmail gửi hợp lệ và App Password 16 ký tự; không bỏ qua release guard.
+- Bản cũ báo `UnknownFailure` khi kiểm tra SMTP: cập nhật lên 2.0.1 hoặc mới hơn để JavaMail provider không bị R8 đổi tên.
 - Build identity mismatch: không phân phối APK; kiểm tra package, version và source keystore.
 - App chưa tự khôi phục tracking sau update: mở app, kiểm tra quyền/notification và trạng thái; không xóa database.
 
 ## Acceptance trước khi phân phối rộng
 
-Trên ít nhất một điện thoại đang có `1.0 (1)` ký bằng fingerprint đã duyệt, cập nhật lên `2.0.0 (2)` mà không uninstall. Kết quả chỉ đạt khi Room History, cấu hình, PIN và tracking state còn nguyên, đồng thời service và lịch báo cáo được reconcile sau khi mở app.
+Trên ít nhất một điện thoại đang có `2.0.0 (2)` ký bằng fingerprint đã duyệt, cập nhật lên `2.0.1 (3)` mà không uninstall. Kết quả chỉ đạt khi Room History, cấu hình, PIN và tracking state còn nguyên, `Lưu và kiểm tra` đăng nhập Gmail thành công, đồng thời service và lịch báo cáo được reconcile sau khi mở app.

@@ -4,9 +4,10 @@ Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profil
 
 ## Cài đặt và quyền
 
-- [ ] Trên máy đang có `1.0 (1)`, cài đè `tracking-gps-2.0.0.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
-- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.0.0 (2)`.
+- [ ] Trên máy đang có `2.0.0 (2)`, cài đè `tracking-gps-2.0.1.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
+- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.0.1 (3)`.
 - [ ] Room History, số thiết bị, Gmail/email nhận, chu kỳ và PIN còn nguyên sau cập nhật.
+- [ ] Mở Settings bằng PIN tầng 2, bấm `Lưu và kiểm tra`; Gmail đăng nhập thành công trên bản 2.0.1.
 - [ ] Trạng thái tracking còn nguyên; sau khi mở app, foreground notification và kỳ báo cáo tiếp theo được reconcile.
 - [ ] Nếu gặp signature mismatch, dừng kiểm thử và bảo toàn package data; không gỡ app để thử lại.
 - [ ] Import file JSON dùng chung; xem trước đúng host, port, chu kỳ, scheme và TLS.
