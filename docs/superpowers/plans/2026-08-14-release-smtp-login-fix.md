@@ -178,23 +178,47 @@ git commit -m "fix: require Gmail credentials for release builds"
 - Consumes: `META-INF/javamail.default.providers` and `META-INF/mailcap` class names supplied by the JavaMail/Activation dependencies.
 - Produces: stable runtime names for `com.sun.mail.smtp.**` and `com.sun.mail.handlers.**` in the release DEX.
 
-- [ ] **Step 1: Add a failing keep-rule policy test**
+- [ ] **Step 1: Add a failing post-R8 artifact test**
 
-Append this source-policy case:
+Append this behavioral case, which builds the real release artifact with non-secret fixture credentials and inspects R8's output:
 
 ```powershell
 It 'preserves JavaMail classes loaded by META-INF provider resources' {
     $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-    $rules = Get-Content -Raw (Join-Path $projectRoot 'app\proguard-rules.pro')
+    $gradle = Join-Path $projectRoot '.tools\gradle-8.13\bin\gradle.bat'
+    $previousUser = $env:SMTP_USER
+    $previousPassword = $env:SMTP_APP_PASSWORD
+    $previousJavaHome = $env:JAVA_HOME
+    $previousGradleHome = $env:GRADLE_USER_HOME
+    $previousAndroidHome = $env:ANDROID_USER_HOME
+    try {
+        $env:SMTP_USER = 'sender@example.com'
+        $env:SMTP_APP_PASSWORD = 'abcdefghijklmnop'
+        $env:JAVA_HOME = Join-Path $projectRoot '.tools\jdk-17.0.20+8'
+        $env:GRADLE_USER_HOME = Join-Path $projectRoot '.tools\gradle-home'
+        $env:ANDROID_USER_HOME = Join-Path $projectRoot '.tools\android-home'
+        Push-Location $projectRoot
+        & $gradle :app:assembleRelease --offline --no-daemon
+        $exitCode = $LASTEXITCODE
+    } finally {
+        Pop-Location
+        $env:SMTP_USER = $previousUser
+        $env:SMTP_APP_PASSWORD = $previousPassword
+        $env:JAVA_HOME = $previousJavaHome
+        $env:GRADLE_USER_HOME = $previousGradleHome
+        $env:ANDROID_USER_HOME = $previousAndroidHome
+    }
 
-    $rules | Should Match '(?m)^-keep class com\.sun\.mail\.smtp\.\*\* \{ \*; \}$'
-    $rules | Should Match '(?m)^-keep class com\.sun\.mail\.handlers\.\*\* \{ \*; \}$'
+    $exitCode | Should Be 0
+    $mapping = Get-Content -Raw (Join-Path $projectRoot 'app\build\outputs\mapping\release\mapping.txt')
+    $mapping | Should Match '(?m)^com\.sun\.mail\.smtp\.SMTPSSLTransport -> com\.sun\.mail\.smtp\.SMTPSSLTransport:$'
+    $mapping | Should Match '(?m)^com\.sun\.mail\.handlers\.text_plain -> com\.sun\.mail\.handlers\.text_plain:$'
 }
 ```
 
 - [ ] **Step 2: Run the policy test and verify RED**
 
-Run the Task 1 Pester command. Expected: only the new keep-rule case fails because `proguard-rules.pro` contains no JavaMail rules.
+Run the Task 1 Pester command. Expected: only the new artifact case fails because the mapping renames `SMTPSSLTransport` and `text_plain`.
 
 - [ ] **Step 3: Add the minimal R8 rules**
 
@@ -210,7 +234,7 @@ Do not disable minification and do not keep unused IMAP/POP3 implementations.
 
 - [ ] **Step 4: Run the policy test and verify GREEN**
 
-Run the Task 1 Pester command. Expected: all release-policy cases pass.
+Run the Task 1 Pester command. Expected: all release-policy cases pass and the mapping retains both original runtime names.
 
 - [ ] **Step 5: Commit the provider fix**
 
