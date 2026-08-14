@@ -51,8 +51,8 @@ if ($gradleExitCode -ne 0) {
 $sourceApk = Join-Path $projectRoot 'app\build\outputs\apk\release\app-release.apk'
 $result = Publish-VerifiedApk -AaptPath $AaptPath -ApkSignerPath $ApkSignerPath `
     -SourceApkPath $sourceApk -OutputDirectory $OutputDirectory `
-    -ExpectedPackage 'com.internal.tracker' -ExpectedVersionCode '2' `
-    -ExpectedVersionName '2.0.0' `
+    -ExpectedPackage 'com.internal.tracker' -ExpectedVersionCode '3' `
+    -ExpectedVersionName '2.0.1' `
     -ExpectedFingerprint '8F:19:12:A3:4E:D2:CB:9D:DF:88:40:DB:49:A7:69:13:42:51:B3:29:74:84:33:36:78:E2:C6:79:CA:E4:F5:85'
 
 Write-Output "Release APK: $($result.ApkPath)"
