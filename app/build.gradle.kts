@@ -15,6 +15,17 @@ val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
     val simpleTaskName = taskName.substringAfterLast(':').lowercase()
     simpleTaskName.contains("release") || simpleTaskName in setOf("assemble", "build", "bundle")
 }
+
+fun secret(name: String): String = providers.gradleProperty(name)
+    .orElse(providers.environmentVariable(name))
+    .orNull
+    ?: gmailSecrets.getProperty(name, "")
+
+fun quoted(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val smtpUser = secret("SMTP_USER").trim()
+val smtpAppPassword = secret("SMTP_APP_PASSWORD").filterNot(Char::isWhitespace)
+val emailPattern = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 val signingPropertiesFile = providers.environmentVariable("TRACKER_SIGNING_PROPERTIES")
     .orNull
     ?.takeIf { it.isNotBlank() }
@@ -23,6 +34,12 @@ val signingPropertiesFile = providers.environmentVariable("TRACKER_SIGNING_PROPE
 val releaseSigning = Properties()
 val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 if (releaseRequested) {
+    require(emailPattern.matches(smtpUser)) {
+        "Release SMTP user is missing or invalid."
+    }
+    require(smtpAppPassword.length == 16) {
+        "Release SMTP App Password must contain exactly 16 non-whitespace characters."
+    }
     require(signingPropertiesFile.isFile) {
         "Release signing properties not found: ${signingPropertiesFile.absolutePath}"
     }
@@ -37,13 +54,6 @@ if (releaseRequested) {
     }
 }
 
-fun secret(name: String): String = providers.gradleProperty(name)
-    .orElse(providers.environmentVariable(name))
-    .orNull
-    ?: gmailSecrets.getProperty(name, "")
-
-fun quoted(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
-
 android {
     namespace = "com.internal.tracker"
     compileSdk = 36
@@ -55,8 +65,8 @@ android {
         versionCode = 2
         versionName = "2.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SMTP_USER", quoted(secret("SMTP_USER")))
-        buildConfigField("String", "SMTP_APP_PASSWORD", quoted(secret("SMTP_APP_PASSWORD")))
+        buildConfigField("String", "SMTP_USER", quoted(smtpUser))
+        buildConfigField("String", "SMTP_APP_PASSWORD", quoted(smtpAppPassword))
     }
 
     buildFeatures {
