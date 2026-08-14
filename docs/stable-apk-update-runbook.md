@@ -39,7 +39,7 @@ Mất private key đồng nghĩa không thể cập nhật các điện thoại 
 
 ## Build bản phát hành
 
-Điền `gmail-secrets.properties` như hướng dẫn hiện có, sau đó chạy:
+Không cần Gmail credential để build; quản trị viên nhập Gmail gửi và App Password trong Settings trên từng điện thoại. `gmail-secrets.properties` chỉ dùng khi chủ động muốn điền sẵn giá trị mặc định. Chạy:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
@@ -82,7 +82,7 @@ Không dùng `-d`, không chạy `adb uninstall` và không xóa package data.
 - `UPDATE_INCOMPATIBLE` hoặc xung đột chữ ký: dừng cài đặt, đối chiếu certificate fingerprint của APK cũ/mới. Không gỡ app trước khi đánh giá và sao lưu dữ liệu.
 - Version downgrade: build versionCode mới cao hơn; không ép downgrade.
 - Thiếu/sai signing properties: khôi phục đúng cặp file backup; không tạo keystore mới.
-- Thiếu/sai Gmail mặc định khi build release: tạo file bỏ qua bởi Git `gmail-secrets.properties` với Gmail gửi hợp lệ và App Password 16 ký tự; không bỏ qua release guard.
+- Gmail chưa được cấu hình: mở Settings bằng PIN tầng 2, nhập Gmail gửi và App Password 16 ký tự, rồi bấm `Lưu và kiểm tra`.
 - Bản cũ báo `UnknownFailure` khi kiểm tra SMTP: cập nhật lên 2.0.1 hoặc mới hơn để JavaMail provider không bị R8 đổi tên.
 - Build identity mismatch: không phân phối APK; kiểm tra package, version và source keystore.
 - App chưa tự khôi phục tracking sau update: mở app, kiểm tra quyền/notification và trạng thái; không xóa database.

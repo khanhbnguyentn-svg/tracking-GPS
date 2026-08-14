@@ -25,7 +25,6 @@ fun quoted(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"
 
 val smtpUser = secret("SMTP_USER").trim()
 val smtpAppPassword = secret("SMTP_APP_PASSWORD").filterNot(Char::isWhitespace)
-val emailPattern = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 val signingPropertiesFile = providers.environmentVariable("TRACKER_SIGNING_PROPERTIES")
     .orNull
     ?.takeIf { it.isNotBlank() }
@@ -34,12 +33,6 @@ val signingPropertiesFile = providers.environmentVariable("TRACKER_SIGNING_PROPE
 val releaseSigning = Properties()
 val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 if (releaseRequested) {
-    require(emailPattern.matches(smtpUser)) {
-        "Release SMTP user is missing or invalid."
-    }
-    require(smtpAppPassword.length == 16) {
-        "Release SMTP App Password must contain exactly 16 non-whitespace characters."
-    }
     require(signingPropertiesFile.isFile) {
         "Release signing properties not found: ${signingPropertiesFile.absolutePath}"
     }

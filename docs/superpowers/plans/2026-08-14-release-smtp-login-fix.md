@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Publish a signed 2.0.1 APK that can load JavaMail's SMTP provider under R8 and cannot be packaged without valid Gmail build credentials.
+**Goal:** Publish a signed 2.0.1 APK that can load JavaMail's SMTP provider under R8 and supports Gmail credentials entered by an administrator during device setup.
 
-**Architecture:** Keep release minification enabled and preserve only the SMTP implementation and MIME handlers that JavaMail loads by resource-declared class name. Validate normalized Gmail build inputs before release signing/configuration, while leaving debug builds credential-optional. Reuse the stable signing and artifact-verification pipeline for version 2.0.1.
+**Architecture:** Keep release minification enabled and preserve only the SMTP implementation and MIME handlers that JavaMail loads by resource-declared class name. Gmail build defaults remain optional; Settings validates and authenticates administrator-entered credentials before encrypted storage. Reuse the stable signing and artifact-verification pipeline for version 2.0.1.
 
 **Tech Stack:** Android Gradle Plugin, Kotlin DSL, R8/ProGuard, JavaMail for Android, PowerShell/Pester, Gradle 8.13, Android SDK 36.
 
@@ -12,8 +12,9 @@
 
 - Release version is `2.0.1` with `versionCode` 3.
 - Release shrinking remains enabled.
-- The sender must be a syntactically valid email address.
-- The Gmail App Password must contain exactly 16 non-whitespace characters.
+- Runtime Settings requires a syntactically valid sender email address.
+- Runtime Settings requires a Gmail App Password containing exactly 16 non-whitespace characters.
+- Release assembly must succeed with empty optional Gmail build defaults.
 - No real Gmail address or App Password may appear in source control, build output, logs, tests, or user-visible errors.
 - Debug and ordinary unit-test builds continue to allow empty Gmail defaults.
 - The release certificate SHA-256 remains `8F:19:12:A3:4E:D2:CB:9D:DF:88:40:DB:49:A7:69:13:42:51:B3:29:74:84:33:36:78:E2:C6:79:CA:E4:F5:85`.
@@ -21,16 +22,18 @@
 
 ## File Map
 
-- `app/build.gradle.kts`: normalize and validate Gmail defaults for release packaging; set version 2.0.1.
+- `app/build.gradle.kts`: keep Gmail defaults optional and normalized; set version 2.0.1.
 - `app/proguard-rules.pro`: preserve dynamically loaded SMTP provider and MIME handler class names.
-- `scripts/tests/ReleaseBuildPolicy.Tests.ps1`: behavioral regression tests for missing/invalid release credentials and static keep-rule policy.
+- `scripts/tests/ReleaseBuildPolicy.Tests.ps1`: behavioral regression tests for optional Gmail defaults and post-R8 provider names.
 - `scripts/tests/BuildReleaseCommand.Tests.ps1`: verify the promoted 2.0.1 artifact and the post-R8 provider mapping.
 - `scripts/build-release-apk.ps1`: require and promote version 2.0.1 / code 3.
 - `docs/stable-apk-update-runbook.md`: document the new artifact and update acceptance path.
 
 ---
 
-### Task 1: Reject Invalid Gmail Credentials During Release Packaging
+### Task 1: Preserve Device-Entered Gmail Configuration
+
+> **Superseded after user review:** Version 1.0.0 intentionally accepts Gmail and App Password in Settings. Do not implement the credential gate described below. Replace it with a release test that sets both SMTP build inputs to empty strings, assembles the signed release, and asserts the generated `BuildConfig` contains empty defaults. Runtime `PilotConfig.isValid()` and `Lưu và kiểm tra` remain responsible for validation and authentication.
 
 **Files:**
 - Modify: `scripts/tests/ReleaseBuildPolicy.Tests.ps1`
@@ -288,7 +291,7 @@ It 'builds and promotes only the approved version 2.0.1 APK' {
 
 - [ ] **Step 2: Run the release command test and verify RED**
 
-Prerequisite: create ignored `gmail-secrets.properties` from `docs/gmail-build-secrets.example.properties` with the dedicated sender and valid App Password. Never print or commit the file.
+No Gmail secret file is required. The release command test may use non-secret fixture values to exercise normalization, while the canonical distribution APK is built with empty defaults so setup remains device-driven.
 
 Run:
 
@@ -345,7 +348,7 @@ git commit -m "build: promote SMTP fix as version 2.0.1"
 Replace current distributed identity and command examples from `2.0.0 (2)` / `tracking-gps-2.0.0.apk` to `2.0.1 (3)` / `tracking-gps-2.0.1.apk`. Update acceptance wording to test the supported upgrade path from 2.0.0 to 2.0.1 without uninstalling. Add these failure entries:
 
 ```markdown
-- Missing/invalid release Gmail defaults: create the ignored `gmail-secrets.properties` with a valid sender and 16-character App Password; never bypass the release guard.
+- Empty release Gmail defaults are supported; enter the sender and 16-character App Password in Settings, then use `Lưu và kiểm tra`.
 - `UnknownFailure` during SMTP setup in an older release: install 2.0.1 or newer, whose R8 rules preserve JavaMail providers.
 ```
 

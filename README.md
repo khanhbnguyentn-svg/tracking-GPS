@@ -12,21 +12,20 @@
 
 Yeu cau: JDK 17, Android SDK Platform 36 va Build Tools 36.0.0.
 
-1. Tao `gmail-secrets.properties` tai thu muc goc tu mau `docs/gmail-build-secrets.example.properties`.
-2. Dien Gmail gui rieng va App Password 16 ky tu. Khong commit file nay.
-3. Chạy setup signing một lần nếu máy chưa có `.signing`:
+1. Gmail và App Password được nhập trên từng điện thoại trong `Cấu hình`; không cần credential để build APK. `gmail-secrets.properties` chỉ là tùy chọn nếu muốn điền sẵn giá trị mặc định nội bộ và không được commit.
+2. Chạy setup signing một lần nếu máy chưa có `.signing`:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-release-signing.ps1
 ```
 
-4. Build và xác minh APK release:
+3. Build và xác minh APK release:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
 ```
 
-APK phân phối: `dist/tracking-gps-2.0.0.apk`. Debug APK chỉ dùng trong phát triển và không được dùng để cập nhật điện thoại. Quy trình signing, backup và cài update: `docs/stable-apk-update-runbook.md`.
+APK phân phối: `dist/tracking-gps-2.0.1.apk`. Debug APK chỉ dùng trong phát triển và không được dùng để cập nhật điện thoại. Quy trình signing, backup và cài update: `docs/stable-apk-update-runbook.md`.
 
 ## Su dung
 

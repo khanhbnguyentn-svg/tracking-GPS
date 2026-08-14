@@ -28,14 +28,14 @@ Khong dung mat khau dang nhap Gmail thuong. Dien thoai khong phai xac minh hai b
 1. Cai Git, JDK 17 va Android Studio hoac Android command-line tools mien phi.
 2. Cai Android SDK Platform 36 va Build Tools 36.0.0.
 3. Clone repository va mo PowerShell tai thu muc du an.
-4. Tao `gmail-secrets.properties`:
+4. Không cần Gmail credential để build. `gmail-secrets.properties` chỉ là tùy chọn nếu muốn điền sẵn mặc định nội bộ:
 
 ```properties
 SMTP_USER=sender@gmail.com
 SMTP_APP_PASSWORD=abcdefghijklmnop
 ```
 
-File that bi `.gitignore`; khong dua credential len GitHub.
+File này bị `.gitignore`; không đưa credential lên GitHub. Khi không tạo file, quản trị viên nhập Gmail gửi và App Password trên từng điện thoại.
 
 5. Chuẩn bị signing một lần trên máy phát hành:
 
@@ -49,15 +49,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-releas
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
 ```
 
-7. Lấy APK tại `dist/tracking-gps-2.0.0.apk`. GitHub Actions chỉ chạy kiểm thử/debug compile và không cung cấp APK cập nhật chính thức. Xem quy trình backup/cập nhật tại `docs/stable-apk-update-runbook.md`.
+7. Lấy APK tại `dist/tracking-gps-2.0.1.apk`. GitHub Actions chỉ chạy kiểm thử/debug compile và không cung cấp APK cập nhật chính thức. Xem quy trình backup/cập nhật tại `docs/stable-apk-update-runbook.md`.
 
 ## 4. Cap phat dien thoai
 
 Khi nâng từ bản cũ, mở APK release và chọn **Cập nhật**; không gỡ app. Sau update, mở app một lần và xác nhận History, cấu hình, PIN, tracking state và lịch báo cáo còn nguyên.
 
 1. Cài APK và mở app; màn `Trạng thái` xuất hiện ngay, không yêu cầu PIN.
-2. Mở `Cấu hình`, nhập PIN quản trị, sau đó nhập số thiết bị duy nhất, email nhận và chu kỳ.
-3. Bam `Luu va kiem tra`. Neu App Password build san con dung, co the de trong o ma moi.
+2. Mở `Cấu hình`, nhập PIN quản trị, sau đó nhập số thiết bị duy nhất, email nhận, chu kỳ, Gmail gửi và App Password 16 ký tự.
+3. Bấm `Lưu và kiểm tra`; chỉ cấu hình được Gmail chấp nhận mới được lưu. Khi đổi các trường khác về sau, có thể để trống ô App Password để giữ giá trị đã lưu.
 4. Cấp vị trí chính xác, `Luôn cho phép` vị trí nền và thông báo khi được hỏi.
 5. Có thể cấp thêm quyền Nhận diện hoạt động để hỗ trợ nhận biết `IN_VEHICLE`. Nếu từ chối hoặc thiết bị không hỗ trợ, app vẫn theo dõi bằng tốc độ và khoảng cách GPS.
 6. Nếu nút `Cấp quyền thiết bị` mở Settings, chọn quyền còn thiếu rồi quay lại app.
