@@ -1,12 +1,14 @@
 package com.internal.tracker.ui
 
-enum class Destination { PIN, STATUS, SETTINGS, HISTORY }
+enum class Destination { STATUS, SETTINGS, HISTORY }
 enum class StatusCommand { GRANT_PERMISSION, START_TRACKING, STOP_TRACKING }
 enum class ProtectedAction { OPEN_SETTINGS, STOP_TRACKING, DELETE_FILTERED, DELETE_ALL }
 
 object AppUiPolicy {
-    fun destinations(unlocked: Boolean): Set<Destination> =
-        if (unlocked) setOf(Destination.STATUS, Destination.SETTINGS, Destination.HISTORY) else setOf(Destination.PIN)
+    val initialDestination: Destination = Destination.STATUS
+
+    fun destinations(): Set<Destination> =
+        setOf(Destination.STATUS, Destination.SETTINGS, Destination.HISTORY)
 
     fun commands(ready: Boolean, tracking: Boolean): Set<StatusCommand> = when {
         tracking -> setOf(StatusCommand.STOP_TRACKING)

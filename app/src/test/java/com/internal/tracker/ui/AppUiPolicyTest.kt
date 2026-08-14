@@ -6,8 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppUiPolicyTest {
-    @Test fun lockedAppExposesOnlyPinDestination() {
-        assertEquals(setOf(Destination.PIN), AppUiPolicy.destinations(unlocked = false))
+    @Test fun appStartsOnStatus() {
+        assertEquals(Destination.STATUS, AppUiPolicy.initialDestination)
+    }
+
+    @Test fun mainNavigationExposesStatusSettingsAndHistory() {
+        assertEquals(
+            setOf(Destination.STATUS, Destination.SETTINGS, Destination.HISTORY),
+            AppUiPolicy.destinations(),
+        )
     }
 
     @Test fun normalStatusCommandsStayMinimal() {

@@ -85,9 +85,8 @@ private data class DeleteRequest(
 @Composable
 fun TrackerApp() {
     val container = (LocalContext.current.applicationContext as TrackerApplication).container
-    var unlocked by remember { mutableStateOf(false) }
     var settingsUnlocked by rememberSaveable { mutableStateOf(false) }
-    var destination by rememberSaveable { mutableStateOf(Destination.STATUS) }
+    var destination by rememberSaveable { mutableStateOf(AppUiPolicy.initialDestination) }
     var pinRequest by remember { mutableStateOf<PinRequest?>(null) }
 
     fun requirePin(action: ProtectedAction, onVerified: () -> Unit) {
@@ -96,60 +95,55 @@ fun TrackerApp() {
 
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
-            if (!unlocked) {
-                PinScreen(container) { unlocked = true }
-            } else {
-                Scaffold(
-                    bottomBar = {
-                        NavigationBar {
-                            NavigationBarItem(
-                                destination == Destination.STATUS,
-                                { destination = Destination.STATUS },
-                                { Icon(Icons.Default.Home, "Trạng thái") },
-                                label = { Text("Trạng thái") },
-                            )
-                            NavigationBarItem(
-                                destination == Destination.SETTINGS,
-                                {
-                                    if (AppUiPolicy.requiresPin(
-                                            ProtectedAction.OPEN_SETTINGS,
-                                            settingsUnlocked,
-                                        )
-                                    ) {
-                                        requirePin(ProtectedAction.OPEN_SETTINGS) {
-                                            settingsUnlocked = true
-                                            destination = Destination.SETTINGS
-                                        }
-                                    } else {
+            Scaffold(
+                bottomBar = {
+                    NavigationBar {
+                        NavigationBarItem(
+                            destination == Destination.STATUS,
+                            { destination = Destination.STATUS },
+                            { Icon(Icons.Default.Home, "Trạng thái") },
+                            label = { Text("Trạng thái") },
+                        )
+                        NavigationBarItem(
+                            destination == Destination.SETTINGS,
+                            {
+                                if (AppUiPolicy.requiresPin(
+                                        ProtectedAction.OPEN_SETTINGS,
+                                        settingsUnlocked,
+                                    )
+                                ) {
+                                    requirePin(ProtectedAction.OPEN_SETTINGS) {
+                                        settingsUnlocked = true
                                         destination = Destination.SETTINGS
                                     }
-                                },
-                                { Icon(Icons.Default.Settings, "Cấu hình") },
-                                label = { Text("Cấu hình") },
-                            )
-                            NavigationBarItem(
-                                destination == Destination.HISTORY,
-                                { destination = Destination.HISTORY },
-                                { Icon(Icons.Default.History, "Lịch sử") },
-                                label = { Text("Lịch sử") },
-                            )
-                        }
-                    },
-                ) { padding ->
-                    when (destination) {
-                        Destination.STATUS -> StatusScreen(
-                            container,
-                            Modifier.padding(padding),
-                            ::requirePin,
+                                } else {
+                                    destination = Destination.SETTINGS
+                                }
+                            },
+                            { Icon(Icons.Default.Settings, "Cấu hình") },
+                            label = { Text("Cấu hình") },
                         )
-                        Destination.SETTINGS -> AdminSettingsScreen(container, Modifier.padding(padding))
-                        Destination.HISTORY -> HistoryScreen(
-                            container,
-                            Modifier.padding(padding),
-                            ::requirePin,
+                        NavigationBarItem(
+                            destination == Destination.HISTORY,
+                            { destination = Destination.HISTORY },
+                            { Icon(Icons.Default.History, "Lịch sử") },
+                            label = { Text("Lịch sử") },
                         )
-                        Destination.PIN -> Unit
                     }
+                },
+            ) { padding ->
+                when (destination) {
+                    Destination.STATUS -> StatusScreen(
+                        container,
+                        Modifier.padding(padding),
+                        ::requirePin,
+                    )
+                    Destination.SETTINGS -> AdminSettingsScreen(container, Modifier.padding(padding))
+                    Destination.HISTORY -> HistoryScreen(
+                        container,
+                        Modifier.padding(padding),
+                        ::requirePin,
+                    )
                 }
             }
         }
@@ -165,21 +159,6 @@ fun TrackerApp() {
                 },
             )
         }
-    }
-}
-
-@Composable
-private fun PinScreen(container: AppContainer, onUnlocked: () -> Unit) {
-    var pin by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf(false) }
-    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Mở khóa ứng dụng", style = MaterialTheme.typography.headlineSmall)
-        PinField(pin, { pin = it; error = false }, error)
-        Button(
-            { if (container.adminPin.verify(pin)) onUnlocked() else error = true },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Mở khóa") }
-        if (error) Text("PIN không đúng", color = MaterialTheme.colorScheme.error)
     }
 }
 
