@@ -11,6 +11,31 @@ val gmailSecrets = Properties().apply {
     rootProject.file("gmail-secrets.properties").takeIf { it.isFile }?.inputStream()?.use(::load)
 }
 
+val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.contains("release", ignoreCase = true)
+}
+val signingPropertiesFile = providers.environmentVariable("TRACKER_SIGNING_PROPERTIES")
+    .orNull
+    ?.takeIf { it.isNotBlank() }
+    ?.let(rootProject::file)
+    ?: rootProject.file(".signing/signing.properties")
+val releaseSigning = Properties()
+val releaseSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+if (releaseRequested) {
+    require(signingPropertiesFile.isFile) {
+        "Release signing properties not found: ${signingPropertiesFile.absolutePath}"
+    }
+    signingPropertiesFile.inputStream().use(releaseSigning::load)
+    releaseSigningKeys.forEach { key ->
+        require(!releaseSigning.getProperty(key).isNullOrBlank()) {
+            "Release signing property missing: $key"
+        }
+    }
+    require(rootProject.file(releaseSigning.getProperty("storeFile")).isFile) {
+        "Release signing keystore not found."
+    }
+}
+
 fun secret(name: String): String = providers.gradleProperty(name)
     .orElse(providers.environmentVariable(name))
     .orNull
@@ -26,8 +51,8 @@ android {
         applicationId = "com.internal.tracker"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SMTP_USER", quoted(secret("SMTP_USER")))
         buildConfigField("String", "SMTP_APP_PASSWORD", quoted(secret("SMTP_APP_PASSWORD")))
@@ -50,9 +75,21 @@ android {
 
     kotlinOptions.jvmTarget = "17"
 
+    val stableReleaseSigning = if (releaseRequested) {
+        signingConfigs.create("stableRelease") {
+            storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+            storePassword = releaseSigning.getProperty("storePassword")
+            keyAlias = releaseSigning.getProperty("keyAlias")
+            keyPassword = releaseSigning.getProperty("keyPassword")
+        }
+    } else {
+        null
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = stableReleaseSigning
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
