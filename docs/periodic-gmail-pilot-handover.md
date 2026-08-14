@@ -37,17 +37,23 @@ SMTP_APP_PASSWORD=abcdefghijklmnop
 
 File that bi `.gitignore`; khong dua credential len GitHub.
 
-5. Build:
+5. Chuẩn bị signing một lần trên máy phát hành:
 
 ```powershell
-./gradlew.bat clean testDebugUnitTest lintDebug assembleDebug --no-daemon
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-release-signing.ps1
 ```
 
-6. Lay APK tai `app/build/outputs/apk/debug/app-debug.apk`.
+6. Build APK release đã ký và xác minh:
 
-GitHub Actions cung build artifact `gps-email-pilot-debug`, nhung may tinh khong can bat sau khi `git push` thanh cong.
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
+```
+
+7. Lấy APK tại `dist/tracking-gps-2.0.0.apk`. GitHub Actions chỉ chạy kiểm thử/debug compile và không cung cấp APK cập nhật chính thức. Xem quy trình backup/cập nhật tại `docs/stable-apk-update-runbook.md`.
 
 ## 4. Cap phat dien thoai
+
+Khi nâng từ bản cũ, mở APK release và chọn **Cập nhật**; không gỡ app. Sau update, mở app một lần và xác nhận History, cấu hình, PIN, tracking state và lịch báo cáo còn nguyên.
 
 1. Cài APK và mở app; màn `Trạng thái` xuất hiện ngay, không yêu cầu PIN.
 2. Mở `Cấu hình`, nhập PIN quản trị, sau đó nhập số thiết bị duy nhất, email nhận và chu kỳ.

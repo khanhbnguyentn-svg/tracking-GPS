@@ -4,7 +4,11 @@ Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profil
 
 ## Cài đặt và quyền
 
-- [ ] Cài APK mới; Device ID có dạng `AND-` + 16 ký tự hex và giữ nguyên sau khi cập nhật app.
+- [ ] Trên máy đang có `1.0 (1)`, cài đè `tracking-gps-2.0.0.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
+- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.0.0 (2)`.
+- [ ] Room History, số thiết bị, Gmail/email nhận, chu kỳ và PIN còn nguyên sau cập nhật.
+- [ ] Trạng thái tracking còn nguyên; sau khi mở app, foreground notification và kỳ báo cáo tiếp theo được reconcile.
+- [ ] Nếu gặp signature mismatch, dừng kiểm thử và bảo toàn package data; không gỡ app để thử lại.
 - [ ] Import file JSON dùng chung; xem trước đúng host, port, chu kỳ, scheme và TLS.
 - [ ] Lưu/chuyển profile trên máy; không có Device ID trong file JSON.
 - [ ] Quyền được hỏi theo thứ tự: vị trí chính xác, vị trí nền, thông báo.

@@ -14,13 +14,19 @@ Yeu cau: JDK 17, Android SDK Platform 36 va Build Tools 36.0.0.
 
 1. Tao `gmail-secrets.properties` tai thu muc goc tu mau `docs/gmail-build-secrets.example.properties`.
 2. Dien Gmail gui rieng va App Password 16 ky tu. Khong commit file nay.
-3. Chay:
+3. Chạy setup signing một lần nếu máy chưa có `.signing`:
 
 ```powershell
-./gradlew.bat clean testDebugUnitTest lintDebug assembleDebug --no-daemon
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-release-signing.ps1
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`.
+4. Build và xác minh APK release:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
+```
+
+APK phân phối: `dist/tracking-gps-2.0.0.apk`. Debug APK chỉ dùng trong phát triển và không được dùng để cập nhật điện thoại. Quy trình signing, backup và cài update: `docs/stable-apk-update-runbook.md`.
 
 ## Su dung
 
