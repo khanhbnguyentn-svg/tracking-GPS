@@ -49,8 +49,8 @@ Describe 'Gradle release signing policy' {
         $previousAndroidHome = $env:ANDROID_USER_HOME
         try {
             $env:TRACKER_SIGNING_PROPERTIES = Join-Path $TestDrive 'missing-signing.properties'
-            $env:SMTP_USER = 'sender@example.com'
-            $env:SMTP_APP_PASSWORD = 'abcdefghijklmnop'
+            $env:SMTP_USER = ''
+            $env:SMTP_APP_PASSWORD = ''
             $env:JAVA_HOME = Join-Path $projectRoot '.tools\jdk-17.0.20+8'
             $env:GRADLE_USER_HOME = Join-Path $projectRoot '.tools\gradle-home'
             $env:ANDROID_USER_HOME = Join-Path $projectRoot '.tools\android-home'
@@ -82,8 +82,8 @@ Describe 'Gradle release signing policy' {
         $previousAndroidHome = $env:ANDROID_USER_HOME
         try {
             $env:TRACKER_SIGNING_PROPERTIES = Join-Path $TestDrive 'missing-aggregate-signing.properties'
-            $env:SMTP_USER = 'sender@example.com'
-            $env:SMTP_APP_PASSWORD = 'abcdefghijklmnop'
+            $env:SMTP_USER = ''
+            $env:SMTP_APP_PASSWORD = ''
             $env:JAVA_HOME = Join-Path $projectRoot '.tools\jdk-17.0.20+8'
             $env:GRADLE_USER_HOME = Join-Path $projectRoot '.tools\gradle-home'
             $env:ANDROID_USER_HOME = Join-Path $projectRoot '.tools\android-home'
@@ -115,8 +115,8 @@ Describe 'Gradle release signing policy' {
         $previousAndroidHome = $env:ANDROID_USER_HOME
         try {
             $env:TRACKER_SIGNING_PROPERTIES = Join-Path $projectRoot '.signing\signing.properties'
-            $env:SMTP_USER = 'sender@example.com'
-            $env:SMTP_APP_PASSWORD = 'abcdefghijklmnop'
+            $env:SMTP_USER = ''
+            $env:SMTP_APP_PASSWORD = ''
             $env:JAVA_HOME = Join-Path $projectRoot '.tools\jdk-17.0.20+8'
             $env:GRADLE_USER_HOME = Join-Path $projectRoot '.tools\gradle-home'
             $env:ANDROID_USER_HOME = Join-Path $projectRoot '.tools\android-home'

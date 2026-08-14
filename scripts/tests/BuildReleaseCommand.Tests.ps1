@@ -7,8 +7,8 @@ Describe 'Verified release build command' {
         $previousSmtpPassword = $env:SMTP_APP_PASSWORD
 
         try {
-            $env:SMTP_USER = 'sender@example.com'
-            $env:SMTP_APP_PASSWORD = 'abcdefghijklmnop'
+            $env:SMTP_USER = ''
+            $env:SMTP_APP_PASSWORD = ''
             $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptPath `
                 -OutputDirectory $outputDirectory 2>&1
             $exitCode = $LASTEXITCODE
