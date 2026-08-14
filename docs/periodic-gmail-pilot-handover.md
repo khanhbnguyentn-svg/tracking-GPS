@@ -49,8 +49,8 @@ GitHub Actions cung build artifact `gps-email-pilot-debug`, nhung may tinh khong
 
 ## 4. Cap phat dien thoai
 
-1. Cai APK va mo bang PIN `18758691`.
-2. Mo `Cau hinh`, nhap so thiet bi duy nhat, email nhan va chu ky.
+1. Cài APK và mở app; màn `Trạng thái` xuất hiện ngay, không yêu cầu PIN.
+2. Mở `Cấu hình`, nhập PIN quản trị, sau đó nhập số thiết bị duy nhất, email nhận và chu kỳ.
 3. Bam `Luu va kiem tra`. Neu App Password build san con dung, co the de trong o ma moi.
 4. Cấp vị trí chính xác, `Luôn cho phép` vị trí nền và thông báo khi được hỏi.
 5. Có thể cấp thêm quyền Nhận diện hoạt động để hỗ trợ nhận biết `IN_VEHICLE`. Nếu từ chối hoặc thiết bị không hỗ trợ, app vẫn theo dõi bằng tốc độ và khoảng cách GPS.
@@ -77,8 +77,8 @@ Màn Status không hiển thị Device ID. Device ID vẫn có trong Cấu hình
 
 ## 6. Bảo vệ bằng PIN
 
-- App yêu cầu PIN ở lần mở đầu tiên.
-- Status và Lịch sử chỉ đọc, không hỏi lại PIN sau khi app đã mở khóa.
+- App mở trực tiếp tại Status, không yêu cầu PIN khi khởi động.
+- Status và Lịch sử chỉ đọc, có thể truy cập mà không cần PIN.
 - Cấu hình yêu cầu PIN ở lần truy cập đầu tiên trong mỗi phiên.
 - Dừng tracking luôn yêu cầu PIN riêng.
 - Xóa theo bộ lọc và xóa tất cả luôn yêu cầu xác nhận rồi nhập PIN riêng.
@@ -86,7 +86,7 @@ Màn Status không hiển thị Device ID. Device ID vẫn có trong Cấu hình
 ## 7. Đổi credential
 
 1. Tao App Password moi trong Gmail.
-2. Mo app, nhap PIN, vao `Cau hinh`.
+2. Mở app, vào `Cấu hình` và nhập PIN quản trị.
 3. Dan ma 16 ky tu vao o App Password va bam `Luu va kiem tra`.
 4. App chi thay credential cu sau khi Gmail chap nhan dang nhap.
 

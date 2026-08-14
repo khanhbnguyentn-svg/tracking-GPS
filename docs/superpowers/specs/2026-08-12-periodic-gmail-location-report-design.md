@@ -1,5 +1,7 @@
 # Periodic Gmail Location Report Design
 
+> Lưu ý: yêu cầu cold-start PIN trong tài liệu lịch sử này đã được thay thế bởi `2026-08-13-remove-cold-start-pin-design.md`. App hiện mở trực tiếp tại Status; PIN vẫn bảo vệ Cấu hình và các thao tác nhạy cảm.
+
 ## Purpose
 
 Replace the prototype's continuous OsmAnd/server upload workflow with scheduled location reports sent directly from the Android app through a dedicated Gmail account. The app supports Android 10 and newer, retains local history, and remains useful when network service is unavailable.

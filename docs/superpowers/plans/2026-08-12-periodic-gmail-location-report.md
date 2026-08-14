@@ -1,5 +1,7 @@
 # Periodic Gmail Location Report Implementation Plan
 
+> Lưu ý: các bước cold-start PIN trong kế hoạch lịch sử này đã được thay thế bởi `../specs/2026-08-13-remove-cold-start-pin-design.md` và `2026-08-14-remove-cold-start-pin.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace continuous server tracking with Android 10+ scheduled Gmail reports that retain local history and survive network outages and reboot.

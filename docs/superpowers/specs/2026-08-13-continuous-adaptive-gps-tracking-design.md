@@ -108,8 +108,8 @@ CSV giữ các cột hiện tại và thêm `record_type`. `TEMP_STOP` chỉ xu�
 
 ### Điều hướng
 
-- Cold start vẫn mở màn hình PIN như ứng dụng hiện tại.
-- Sau khi mở khóa, Status và History xem được mà không hỏi PIN thêm.
+- Cold start mở trực tiếp màn Status, không hiển thị màn hình hoặc dialog PIN.
+- Status và History xem được mà không yêu cầu PIN.
 - Khi chọn Settings lần đầu trong phiên app, hiển thị dialog PIN. Sau khi đúng PIN, Settings được mở khóa cho phần còn lại của phiên.
 - Trạng thái mở khóa Settings chỉ thuộc phiên chạy, không lưu vĩnh viễn.
 

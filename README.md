@@ -24,8 +24,8 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Su dung
 
-1. Mở app bằng PIN test mặc định `18758691`.
-2. Nhập PIN riêng khi mở `Cấu hình`; việc mở khóa có hiệu lực trong phiên app hiện tại.
+1. Mở app; màn `Trạng thái` hiển thị ngay và `Lịch sử` có thể xem mà không cần PIN.
+2. Nhập PIN khi mở `Cấu hình` lần đầu trong phiên app; sau khi xác thực đúng, việc mở khóa có hiệu lực tới khi tiến trình app kết thúc.
 3. Nhập số thiết bị `001`-`100`, email nhận, chu kỳ và Gmail gửi.
 4. App Password để trống nếu giữ giá trị đã lưu; nhập mã mới để thay đổi.
 5. Bấm `Lưu và kiểm tra`, cấp quyền vị trí nền và thông báo, sau đó `Bắt đầu theo dõi`.

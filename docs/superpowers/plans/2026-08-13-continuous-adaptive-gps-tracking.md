@@ -16,7 +16,7 @@
 - Dùng `START`, `PERIODIC`, `TEMP_STOP`, `STOP`; ứng viên dừng chưa kết luận có `isFinalized = false` và không được gửi email.
 - `TEMP_STOP` được nâng cấp trên cùng row thành `STOP` sau 120 giây đứng yên; không tạo row STOP trùng.
 - Giữ CSV, thêm `record_type`; không chuyển sang JSON.
-- PIN bắt buộc cho Settings lần đầu mỗi session, mỗi lần dừng tracking, và mọi thao tác xóa.
+- App mở trực tiếp tại Status; PIN bắt buộc cho Settings lần đầu mỗi session, mỗi lần dừng tracking, và mọi thao tác xóa.
 - History xóa theo bộ lọc Năm/Tháng hoặc xóa tất cả; không có nút “Xóa tháng này”.
 - ReportWorker xóa record cũ hơn một năm trước delivery và không tự chụp GPS.
 - Mỗi thay đổi production phải theo RED → GREEN → REFACTOR; không gộp nhiều hành vi vào một test.
@@ -601,7 +601,7 @@ Run: `./gradlew.bat testDebugUnitTest --tests "com.internal.tracker.ui.StatusUiM
 
 - [ ] **Step 3: Implement reusable PIN verification dialog and Settings session unlock**
 
-Keep cold-start `PinScreen`. Add `settingsUnlocked` with `rememberSaveable`, intercept Settings tab selection, and navigate only after `adminPin.verify(pin)`. Stop tracking always opens a fresh PIN dialog and calls `container.stopTracking()` only on success.
+Cold-start `PinScreen` đã được thay thế theo thiết kế `2026-08-13-remove-cold-start-pin-design.md`: app mở trực tiếp tại Status. Giữ `settingsUnlocked` với `rememberSaveable`, chặn lần chọn Settings đầu tiên và chỉ điều hướng sau `adminPin.verify(pin)`. Stop tracking luôn mở dialog PIN mới và chỉ gọi `container.stopTracking()` khi xác thực thành công.
 
 - [ ] **Step 4: Implement optional Activity Recognition permission UI**
 

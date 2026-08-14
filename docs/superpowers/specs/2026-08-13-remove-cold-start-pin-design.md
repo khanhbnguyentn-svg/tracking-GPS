@@ -2,9 +2,9 @@
 
 ## Trạng thái
 
-Thiết kế đã được người dùng duyệt ngày 2026-08-13. Tài liệu này thay thế phần yêu cầu PIN khi cold start trong `2026-08-13-continuous-adaptive-gps-tracking-design.md`.
+Thiết kế đã được người dùng duyệt ngày 2026-08-13 và triển khai ngày 2026-08-14. Tài liệu này thay thế phần yêu cầu PIN khi cold start trong `2026-08-13-continuous-adaptive-gps-tracking-design.md`.
 
-Chưa triển khai code trong phiên tạo tài liệu này. Phiên tiếp theo bắt đầu bằng việc viết kế hoạch triển khai TDD.
+Kế hoạch triển khai và bằng chứng TDD được ghi tại `../plans/2026-08-14-remove-cold-start-pin.md`.
 
 ## Mục tiêu
 
