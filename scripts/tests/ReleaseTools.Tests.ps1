@@ -116,3 +116,53 @@ Describe 'APK release identity' {
             -ExpectedFingerprint $env:TEST_EXPECTED_FINGERPRINT } | Should Not Throw
     }
 }
+
+Describe 'Release signing preparation command' {
+    It 'prepares signing material without deleting the source or printing passwords' {
+        $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $keyTool = Join-Path $projectRoot '.tools\jdk-17.0.20+8\bin\keytool.exe'
+        $sourceKeyStore = Join-Path $TestDrive 'wrapper-source.p12'
+        $destination = Join-Path $TestDrive 'wrapper-signing'
+        & $keyTool -genkeypair -alias source -keyalg RSA -keysize 2048 -validity 365 `
+            -dname 'CN=Wrapper Test' -storetype PKCS12 -keystore $sourceKeyStore `
+            -storepass 'WrapperSource123' -keypass 'WrapperSource123' 2>&1 | Out-Null
+        $fingerprint = Get-KeyStoreFingerprint -KeyToolPath $keyTool -KeyStorePath $sourceKeyStore `
+            -StorePassword 'WrapperSource123' -Alias 'source'
+        $scriptPath = Join-Path $projectRoot 'scripts\prepare-release-signing.ps1'
+
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptPath `
+            -KeyToolPath $keyTool -SourceKeyStore $sourceKeyStore `
+            -SourceStorePassword 'WrapperSource123' -SourceAlias 'source' `
+            -DestinationDirectory $destination -ExpectedFingerprint $fingerprint 2>&1
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            throw "Preparation command failed: $($output -join ' ')"
+        }
+        $exitCode | Should Be 0
+        Test-Path $sourceKeyStore | Should Be $true
+        Test-Path (Join-Path $destination 'tracker-release.p12') | Should Be $true
+        $propertiesPath = Join-Path $destination 'signing.properties'
+        Test-Path $propertiesPath | Should Be $true
+        $generatedPassword = ((Get-Content $propertiesPath | Where-Object { $_ -match '^storePassword=' }) -split '=', 2)[1]
+        ($output -join "`n") | Should Not Match 'WrapperSource123'
+        ($output -join "`n") | Should Not Match ([regex]::Escape($generatedPassword))
+        ($output -join "`n") | Should Match $fingerprint
+    }
+
+    It 'resolves the project keytool and approved source keystore by default' {
+        $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        $scriptPath = Join-Path $projectRoot 'scripts\prepare-release-signing.ps1'
+        $destination = Join-Path $TestDrive 'default-signing'
+
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptPath `
+            -DestinationDirectory $destination 2>&1
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            throw "Default preparation command failed: $($output -join ' ')"
+        }
+        Test-Path (Join-Path $destination 'tracker-release.p12') | Should Be $true
+        ($output -join "`n") | Should Match '8F1912A34ED2CB9DDF8840DB49A769134251B3297484333678E2C679CAE4F585'
+    }
+}

@@ -1,5 +1,22 @@
 Set-StrictMode -Version Latest
 
+function Invoke-NativeTool {
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = & $FilePath @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    return [PSCustomObject]@{ ExitCode = $exitCode; Output = @($output) }
+}
+
 function Normalize-Fingerprint {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Fingerprint)
@@ -71,10 +88,12 @@ function Get-KeyStoreFingerprint {
     $certificatePath = Join-Path (Split-Path -Parent $KeyStorePath) `
         ('.release-cert-{0}.der' -f [Guid]::NewGuid().ToString('N'))
     try {
-        $keyToolOutput = & $KeyToolPath -exportcert -alias $Alias -keystore $KeyStorePath `
-            -storepass $StorePassword -file $certificatePath 2>&1
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
-            throw "Could not export certificate for alias '$Alias': $($keyToolOutput -join ' ')"
+        $exportResult = Invoke-NativeTool -FilePath $KeyToolPath -Arguments @(
+            '-exportcert', '-alias', $Alias, '-keystore', $KeyStorePath,
+            '-storepass', $StorePassword, '-file', $certificatePath
+        )
+        if ($exportResult.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
+            throw "Could not export certificate for alias '$Alias': $($exportResult.Output -join ' ')"
         }
 
         $certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($certificatePath)
@@ -129,12 +148,15 @@ function Initialize-ReleaseSigning {
         }
 
         $password = New-ReleasePassword -Length 32
-        $importOutput = & $KeyToolPath -importkeystore -noprompt `
-            -srckeystore $SourceKeyStore -srcstorepass $SourceStorePassword -srcalias $SourceAlias `
-            -destkeystore $destinationKeyStore -deststoretype PKCS12 -deststorepass $password `
-            -destkeypass $password -destalias 'tracker-release' 2>&1
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $destinationKeyStore -PathType Leaf)) {
-            throw "Could not import the approved release signing key: $($importOutput -join ' ')"
+        $importResult = Invoke-NativeTool -FilePath $KeyToolPath -Arguments @(
+            '-importkeystore', '-noprompt', '-srckeystore', $SourceKeyStore,
+            '-srcstorepass', $SourceStorePassword, '-srcalias', $SourceAlias,
+            '-destkeystore', $destinationKeyStore, '-deststoretype', 'PKCS12',
+            '-deststorepass', $password, '-destkeypass', $password,
+            '-destalias', 'tracker-release'
+        )
+        if ($importResult.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $destinationKeyStore -PathType Leaf)) {
+            throw "Could not import the approved release signing key: $($importResult.Output -join ' ')"
         }
         $createdKeyStore = $true
 
@@ -188,11 +210,11 @@ function Get-ApkIdentity {
         }
     }
 
-    $badgingOutput = & $AaptPath dump badging $ApkPath 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not inspect APK package metadata: $($badgingOutput -join ' ')"
+    $badgingResult = Invoke-NativeTool -FilePath $AaptPath -Arguments @('dump', 'badging', $ApkPath)
+    if ($badgingResult.ExitCode -ne 0) {
+        throw "Could not inspect APK package metadata: $($badgingResult.Output -join ' ')"
     }
-    $packageLine = $badgingOutput | Where-Object { $_ -match '^package:' } | Select-Object -First 1
+    $packageLine = $badgingResult.Output | Where-Object { $_ -match '^package:' } | Select-Object -First 1
     if (-not $packageLine -or $packageLine -notmatch "name='([^']+)'\s+versionCode='([^']+)'\s+versionName='([^']+)'") {
         throw 'APK package metadata did not contain package name, versionCode, and versionName.'
     }
@@ -200,11 +222,11 @@ function Get-ApkIdentity {
     $versionCode = $Matches[2]
     $versionName = $Matches[3]
 
-    $signingOutput = & $ApkSignerPath verify --print-certs $ApkPath 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "APK signature verification failed: $($signingOutput -join ' ')"
+    $signingResult = Invoke-NativeTool -FilePath $ApkSignerPath -Arguments @('verify', '--print-certs', $ApkPath)
+    if ($signingResult.ExitCode -ne 0) {
+        throw "APK signature verification failed: $($signingResult.Output -join ' ')"
     }
-    $fingerprintLine = $signingOutput |
+    $fingerprintLine = $signingResult.Output |
         Where-Object { $_ -match 'certificate SHA-256 digest:\s*([0-9a-fA-F:]+)' } |
         Select-Object -First 1
     if (-not $fingerprintLine -or $fingerprintLine -notmatch 'certificate SHA-256 digest:\s*([0-9a-fA-F:]+)') {

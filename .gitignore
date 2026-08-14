@@ -6,6 +6,8 @@
 /.kotlin/
 /local.properties
 /gmail-secrets.properties
+/.signing/
+/dist/
 /**/build/
 /.idea/
 /gps-receiver/node_modules/
