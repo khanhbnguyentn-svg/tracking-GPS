@@ -12,7 +12,8 @@ val gmailSecrets = Properties().apply {
 }
 
 val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
-    taskName.contains("release", ignoreCase = true)
+    val simpleTaskName = taskName.substringAfterLast(':').lowercase()
+    simpleTaskName.contains("release") || simpleTaskName in setOf("assemble", "build", "bundle")
 }
 val signingPropertiesFile = providers.environmentVariable("TRACKER_SIGNING_PROPERTIES")
     .orNull
