@@ -114,3 +114,20 @@ Màn Status không hiển thị Device ID. Device ID vẫn có trong Cấu hình
 - Mo/chia se CSV va doi chieu email nhan.
 
 JVM unit test va lint khong thay the cac buoc thiet bi nay.
+
+## 9. Tracking integrity diagnostics
+
+Từ bản 2.1.0, app kiểm tra callback GPS mỗi 10 giây. Khi không có callback trong 30 giây, app tạo đúng một incident `GPS_GAP`, thử đăng ký lại location và gửi ngay email `GPS_GAP_OPENED`. Khi callback trở lại, app đóng cùng incident ID và gửi `GPS_GAP_RECOVERED`. Nếu mất mạng hoặc SMTP thất bại, app không gửi lặp liên tục; incident còn chờ và được đưa vào report định kỳ sau.
+
+Report định kỳ có thể gồm ba attachment: route CSV, diagnostic summary CSV và diagnostic samples CSV. Report vẫn được gửi nếu chỉ có diagnostics mà không có route mới. Mỗi report có report ID ổn định để admin đối chiếu các email trùng hoặc thiếu kỳ.
+
+Diagnostics chỉ quan sát và báo cáo. Nó không loại bỏ điểm GPS sai số lớn, không sửa tọa độ, không thay đổi quyết định `START`/`PERIODIC`/`TEMP_STOP`/`STOP`, và không xuất hiện trong UI dành cho user.
+
+Vận hành retention:
+
+- Route record và incident summary cũ hơn một năm được tự xóa khi chạy report.
+- Diagnostic samples đã report được giữ tối đa 30 ngày; incident chưa report được giữ tối đa một năm.
+- Không ghi Gmail App Password, PIN, stack trace hoặc tọa độ đầy đủ vào biên bản kiểm thử.
+- Khi điều tra mất dữ liệu, đối chiếu report ID, incident ID, thời điểm OPENED/RECOVERED, trạng thái foreground service và attachment; backend/admin xử lý logic độ chính xác GPS.
+
+Quy trình kiểm thử signed build đầy đủ nằm trong `docs/android-14-device-test-checklist.md`, gồm Location off/on 40 giây, mất mạng rồi fallback định kỳ, reboot, update in-place, cadence 2 phút và `TEMP_STOP`/`STOP` bình thường.

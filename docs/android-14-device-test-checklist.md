@@ -46,3 +46,31 @@ Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profil
 - [ ] Tạm tắt cảnh báo cho máy test, đặt hạn ngắn; hết hạn notification được gắn lại tự động.
 
 Kết quả chỉ đạt khi thử ít nhất một máy Android 14 và các model hãng thực tế sẽ triển khai. Các lỗi do chính sách pin của hãng phải được ghi thành hướng dẫn riêng theo model.
+
+## Tracking integrity diagnostics - signed build 2.1.0
+
+Chỉ thực hiện các bước sau với APK release đã ký đúng certificate. Không cài debug APK lên máy đang chứa dữ liệu vận hành.
+
+### GPS gap khi có mạng
+
+- [ ] Bật tracking, xác nhận foreground service đang chạy và ghi lại app version, incident test time và service state.
+- [ ] Tắt Location ít nhất 40 giây; service phải tiếp tục foreground.
+- [ ] Xác nhận chỉ có một email `GPS_GAP_OPENED`, không phát sinh email lặp lại theo mỗi health check 10 giây.
+- [ ] Bật lại Location; email `GPS_GAP_RECOVERED` phải dùng cùng incident ID và có duration cùng evidence trước/sau.
+- [ ] Không lưu credential hoặc tọa độ đầy đủ trong log test; chỉ lưu incident ID, timestamp, count, service state và subject email đã che thông tin.
+
+### Mất mạng và fallback định kỳ
+
+- [ ] Tắt mạng trước khi tạo một GPS gap khác; lỗi SMTP không được dừng tracking hoặc foreground service.
+- [ ] Bật lại mạng rồi chờ/trigger kỳ report tiếp theo.
+- [ ] Email định kỳ phải chứa `diagnostic-summary` và `diagnostic-samples`; incident chưa gửi tức thời phải nằm trong attachment.
+- [ ] Email không chứa Gmail App Password, PIN hoặc stack trace.
+
+### Reboot, update và dữ liệu hành trình
+
+- [ ] Khi tracking đang bật, reboot máy, mở khóa user profile một lần và không bấm Start lại.
+- [ ] Foreground service và request `HIGH_ACCURACY` 10 giây phải tự phục hồi; gap suy luận sau reboot chỉ được tạo một lần.
+- [ ] Cài đè signed APK bằng `adb install -r`; `MY_PACKAGE_REPLACED` phải phục hồi tracking mà không reset `startedAt`.
+- [ ] Khi xe chạy, route vẫn lưu `PERIODIC` mỗi 2 phút; diagnostics không được xóa, sửa, trì hoãn hoặc thêm route record giả.
+- [ ] Một `TEMP_STOP` dưới 2 phút và một `STOP` từ 2 phút trở lên theo đúng thứ tự không được tạo anomaly giả.
+- [ ] Status, History và Settings không hiển thị màn hình diagnostics mới.
