@@ -7,6 +7,7 @@ class DiagnosticRepository(
     private val incidentIds: () -> String = { UUID.randomUUID().toString() },
 ) {
     suspend fun incident(id: String) = store.incident(id)
+    suspend fun openIncident(type: IncidentType) = store.openIncident(type)
 
     suspend fun openGap(
         openedAt: Long,
@@ -48,6 +49,45 @@ class DiagnosticRepository(
     suspend fun save(incident: DiagnosticIncident, samples: List<DiagnosticSample> = emptyList()) {
         store.upsertIncident(incident)
         if (samples.isNotEmpty()) store.insertSamples(samples)
+    }
+
+    suspend fun saveFinding(finding: DiagnosticFinding): DiagnosticIncident {
+        val id = incidentIds()
+        val incident = DiagnosticIncident(
+            incidentId = id,
+            type = finding.type,
+            reasonCodes = finding.reasonCodes.sorted().joinToString(","),
+            openedAt = finding.openedAt,
+            recoveredAt = finding.recoveredAt,
+            state = IncidentState.RECOVERED,
+            confidenceScore = finding.confidenceScore,
+            confidenceBand = finding.confidenceBand,
+            deviceCondition = DeviceCondition.NORMAL,
+            evidenceComplete = true,
+        )
+        val triggerIndex = (finding.samples.size - 4).coerceAtLeast(0)
+        val samples = finding.samples.mapIndexed { index, observed ->
+            DiagnosticSample(
+                incidentId = id,
+                sequence = index,
+                role = when {
+                    index < triggerIndex -> EvidenceRole.BEFORE
+                    index == triggerIndex -> EvidenceRole.TRIGGER
+                    else -> EvidenceRole.AFTER
+                },
+                capturedAt = observed.fix.capturedAt,
+                receivedAt = observed.receivedAt,
+                latitude = observed.fix.latitude,
+                longitude = observed.fix.longitude,
+                accuracy = observed.fix.accuracy,
+                speedMetersPerSecond = observed.fix.speedMetersPerSecond,
+                derivedDistanceMeters = null,
+                derivedSpeedMetersPerSecond = null,
+                signalFlags = if (index == triggerIndex) incident.reasonCodes else "",
+            )
+        }
+        save(incident, samples)
+        return incident
     }
 
     suspend fun pendingBundle(limit: Int): DiagnosticBundle {

@@ -12,6 +12,12 @@ import com.internal.tracker.config.DeviceIdProvider
 import com.internal.tracker.config.EncryptedPilotConfigStore
 import com.internal.tracker.config.EncryptedPinPreferences
 import com.internal.tracker.data.AppDatabase
+import com.internal.tracker.diagnostics.DiagnosticAlertScheduler
+import com.internal.tracker.diagnostics.DiagnosticRepository
+import com.internal.tracker.diagnostics.EventSequenceValidator
+import com.internal.tracker.diagnostics.GpsGapDetector
+import com.internal.tracker.diagnostics.TrackingIntegrityMonitor
+import com.internal.tracker.diagnostics.TrajectoryAnomalyDetector
 import com.internal.tracker.export.DailyCsvStore
 import com.internal.tracker.history.LocationHistoryRepository
 import com.internal.tracker.mail.GmailSmtpSender
@@ -36,7 +42,7 @@ import java.time.ZoneId
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
     private val database = Room.databaseBuilder(appContext, AppDatabase::class.java, "tracker.db")
-        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
         .build()
     val trackingPreferences = TrackingPreferences(appContext)
     val pilotConfig = EncryptedPilotConfigStore(appContext)
@@ -57,6 +63,15 @@ class AppContainer(context: Context) {
 
 
     val history = LocationHistoryRepository(database.locationRecordDao())
+    val diagnostics = DiagnosticRepository(database.diagnosticDao())
+    val trackingIntegrityMonitor = TrackingIntegrityMonitor(
+        gapDetector = GpsGapDetector(),
+        trajectoryDetector = TrajectoryAnomalyDetector(),
+        sequenceValidator = EventSequenceValidator(),
+        repository = diagnostics,
+        alertScheduler = DiagnosticAlertScheduler { _, _ -> },
+        onError = { trackingPreferences.lastError = it },
+    )
     val csv = DailyCsvStore(appContext)
     val gmail = GmailSmtpSender()
     private val battery = BatteryReader(appContext)
