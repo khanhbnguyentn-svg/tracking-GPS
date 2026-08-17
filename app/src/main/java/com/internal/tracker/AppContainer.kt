@@ -19,6 +19,7 @@ import com.internal.tracker.mail.ReportDelivery
 import com.internal.tracker.report.BatteryReader
 import com.internal.tracker.report.ReportRun
 import com.internal.tracker.schedule.WorkManagerReportScheduler
+import com.internal.tracker.schedule.AppLaunchReconcilePolicy
 import com.internal.tracker.schedule.ReconcileAction
 import com.internal.tracker.schedule.ScheduleReceiverPolicy
 import com.internal.tracker.history.RecordType
@@ -125,6 +126,12 @@ class AppContainer(context: Context) {
                 ReconcileAction.TRACKING -> reconcileTracking()
                 ReconcileAction.SCHEDULE -> reconcileSchedule()
             }
+        }
+    }
+
+    fun reconcileAppLaunch() {
+        if (ReconcileAction.TRACKING in AppLaunchReconcilePolicy.actions(trackingPreferences.enabled)) {
+            reconcileTracking()
         }
     }
 

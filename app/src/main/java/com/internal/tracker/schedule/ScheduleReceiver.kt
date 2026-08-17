@@ -13,6 +13,11 @@ object ScheduleReceiverPolicy {
     }
 }
 
+object AppLaunchReconcilePolicy {
+    fun actions(trackingEnabled: Boolean): Set<ReconcileAction> =
+        if (trackingEnabled) setOf(ReconcileAction.TRACKING) else emptySet()
+}
+
 interface ScheduleOwner { fun reconcileBackgroundWork() }
 
 class ScheduleReceiver : BroadcastReceiver() {
