@@ -55,8 +55,8 @@ android {
         applicationId = "com.internal.tracker"
         minSdk = 29
         targetSdk = 36
-        versionCode = 3
-        versionName = "2.0.1"
+        versionCode = 4
+        versionName = "2.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SMTP_USER", quoted(smtpUser))
         buildConfigField("String", "SMTP_APP_PASSWORD", quoted(smtpAppPassword))
