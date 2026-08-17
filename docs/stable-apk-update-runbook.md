@@ -3,8 +3,8 @@
 ## Danh tính bản phát hành
 
 - Package: `com.internal.tracker`
-- Bản hiện tại: `2.0.3 (5)`
-- APK phân phối: `dist/tracking-gps-2.0.3.apk`
+- Bản hiện tại: `2.1.0 (6)`
+- APK phân phối: `dist/tracking-gps-2.1.0.apk`
 - Certificate SHA-256: `8F:19:12:A3:4E:D2:CB:9D:DF:88:40:DB:49:A7:69:13:42:51:B3:29:74:84:33:36:78:E2:C6:79:CA:E4:F5:85`
 
 Chỉ APK có đúng package, version tăng dần và certificate trên mới được dùng để cập nhật các điện thoại hiện có. Debug APK hoặc artifact từ GitHub Actions chỉ phục vụ kiểm thử, không phải bản phân phối.
@@ -48,13 +48,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-
 Script chạy unit tests, lint, release build, xác minh package/version/chữ ký rồi mới tạo:
 
 ```text
-dist/tracking-gps-2.0.3.apk
+dist/tracking-gps-2.1.0.apk
 ```
 
 Nếu file cùng version đã tồn tại, script dừng để tránh phát hành lại một `versionCode` với nội dung khác. Sau khi bàn giao, lưu thêm SHA-256 của chính file APK:
 
 ```powershell
-Get-FileHash .\dist\tracking-gps-2.0.3.apk -Algorithm SHA256
+Get-FileHash .\dist\tracking-gps-2.1.0.apk -Algorithm SHA256
 ```
 
 Mỗi APK đã phân phối phải tăng `versionCode` ít nhất 1. `versionName` dùng `MAJOR.MINOR.PATCH`. Không dùng downgrade vì database không có migration ngược.
@@ -72,7 +72,7 @@ Mỗi APK đã phân phối phải tăng `versionCode` ít nhất 1. `versionNam
 ### ADB
 
 ```powershell
-adb install -r .\dist\tracking-gps-2.0.3.apk
+adb install -r .\dist\tracking-gps-2.1.0.apk
 ```
 
 Không dùng `-d`, không chạy `adb uninstall` và không xóa package data.
@@ -89,4 +89,15 @@ Không dùng `-d`, không chạy `adb uninstall` và không xóa package data.
 
 ## Acceptance trước khi phân phối rộng
 
-Trên ít nhất một điện thoại đang có `2.0.2 (4)` ký bằng fingerprint đã duyệt, cập nhật lên `2.0.3 (5)` mà không uninstall. Kết quả chỉ đạt khi Room History, cấu hình, PIN và tracking state còn nguyên, `Lưu và kiểm tra` đăng nhập Gmail thành công, đồng thời tracking đang bật tự phục hồi sau `MY_PACKAGE_REPLACED` mà không cần reboot. Nếu hệ thống trì hoãn broadcast, mở app phải phục hồi tracking nhưng không thay lịch báo cáo. Khi xe đã dừng trên 2 phút, Android phải tiếp tục hiển thị request `HIGH_ACCURACY` 10 giây của `com.internal.tracker`; khi di chuyển lại, app phải tạo `START` mới mà không cần mở lại app.
+Trên ít nhất một điện thoại đang có `2.0.3 (5)` ký bằng fingerprint đã duyệt, cập nhật lên `2.1.0 (6)` mà không uninstall. Kết quả chỉ đạt khi Room History, cấu hình, PIN và tracking state còn nguyên, `Lưu và kiểm tra` đăng nhập Gmail thành công, đồng thời tracking đang bật tự phục hồi sau `MY_PACKAGE_REPLACED` mà không cần reboot. Nếu hệ thống trì hoãn broadcast, mở app phải phục hồi tracking nhưng không thay lịch báo cáo. Phải hoàn thành các bước GPS gap, network fallback, reboot, cadence 2 phút và `TEMP_STOP`/`STOP` trong checklist Android 14–16 trước khi phân phối rộng.
+
+## Kết quả build và kiểm thử 2.1.0 ngày 2026-08-17
+
+- APK SHA-256: `19F6299421BF3879466158619A973BC3AB36F4349557F014834844FBF39955C1`.
+- `aapt`: package `com.internal.tracker`, `versionCode=6`, `versionName=2.1.0`.
+- `apksigner`: APK Signature Scheme v2 hợp lệ, một signer, certificate SHA-256 `8F1912A34ED2CB9DDF8840DB49A769134251B3297484333678E2C679CAE4F585`.
+- Samsung `SM_A566B`: `adb install -r` từ 2.0.3 (5) thành công; History/Status còn truy cập được và hiển thị 2,100 record; tracking state còn bật.
+- Sau `MY_PACKAGE_REPLACED` và sau reboot: foreground service tự phục hồi, request `HIGH_ACCURACY` 10 giây hoạt động mà không bấm Start.
+- Location off 45 giây khi có mạng và khi mobile data tắt: foreground service không dừng; Location, mobile data và request GPS được khôi phục sau test.
+- ReportWorker đã được force đúng WorkManager namespace và bắt đầu chạy; xác nhận email/attachment ở hộp thư vẫn cần admin thực hiện.
+- Chưa xác nhận trong bài test tĩnh: route cadence khi xe chạy, STOP/TEMP_STOP thực địa, Gmail credential/PIN còn nguyên và nội dung attachment nhận được.

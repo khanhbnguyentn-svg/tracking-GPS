@@ -4,10 +4,10 @@ Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profil
 
 ## Cài đặt và quyền
 
-- [ ] Trên máy đang có `2.0.2 (4)`, cài đè `tracking-gps-2.0.3.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
-- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.0.3 (5)`.
+- [ ] Trên máy đang có `2.0.3 (5)`, cài đè `tracking-gps-2.1.0.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
+- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.1.0 (6)`.
 - [ ] Room History, số thiết bị, Gmail/email nhận, chu kỳ và PIN còn nguyên sau cập nhật.
-- [ ] Mở Settings bằng PIN tầng 2, bấm `Lưu và kiểm tra`; Gmail đăng nhập thành công trên bản 2.0.3.
+- [ ] Mở Settings bằng PIN tầng 2, bấm `Lưu và kiểm tra`; Gmail đăng nhập thành công trên bản 2.1.0.
 - [ ] Trạng thái tracking còn nguyên; sau khi mở app, foreground notification và kỳ báo cáo tiếp theo được reconcile.
 - [ ] Nếu tracking đang bật trước cập nhật, `MY_PACKAGE_REPLACED` tự phục hồi foreground service mà không cần reboot; nếu broadcast bị trì hoãn, mở app phục hồi service nhưng không thay lịch báo cáo.
 - [ ] Nếu gặp signature mismatch, dừng kiểm thử và bảo toàn package data; không gỡ app để thử lại.
@@ -74,3 +74,15 @@ Chỉ thực hiện các bước sau với APK release đã ký đúng certifica
 - [ ] Khi xe chạy, route vẫn lưu `PERIODIC` mỗi 2 phút; diagnostics không được xóa, sửa, trì hoãn hoặc thêm route record giả.
 - [ ] Một `TEMP_STOP` dưới 2 phút và một `STOP` từ 2 phút trở lên theo đúng thứ tự không được tạo anomaly giả.
 - [ ] Status, History và Settings không hiển thị màn hình diagnostics mới.
+
+### Kết quả Samsung SM_A566B - 2026-08-17
+
+- [x] Update in-place 2.0.3 (5) lên 2.1.0 (6) bằng `adb install -r`; package data không bị uninstall.
+- [x] `MY_PACKAGE_REPLACED` phục hồi foreground service và GPS HIGH_ACCURACY 10 giây.
+- [x] Location off 45 giây: service vẫn foreground; Location và request GPS khôi phục sau khi bật lại.
+- [x] Reboot khi tracking bật: user 0 trở lại `RUNNING_UNLOCKED`; service/GPS tự phục hồi, không mở app và không bấm Start.
+- [x] Network-loss gap: mobile data và Location được khôi phục; foreground tracking không dừng.
+- [x] Status sau update hiển thị `Đang theo dõi` và 2,100 record; backup route ngày 17 tiếp tục được cập nhật.
+- [ ] Admin xác nhận email OPENED/RECOVERED cùng incident ID và hai diagnostics attachment trong report đã force.
+- [ ] User xác nhận Settings, Gmail credential và PIN còn nguyên bằng `Lưu và kiểm tra`.
+- [ ] Chạy xe để xác nhận PERIODIC 2 phút và một chuỗi TEMP_STOP/STOP bình thường không tạo anomaly giả.

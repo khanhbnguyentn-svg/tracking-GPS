@@ -49,7 +49,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-releas
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
 ```
 
-7. Lấy APK tại `dist/tracking-gps-2.0.1.apk`. GitHub Actions chỉ chạy kiểm thử/debug compile và không cung cấp APK cập nhật chính thức. Xem quy trình backup/cập nhật tại `docs/stable-apk-update-runbook.md`.
+7. Lấy APK tại `dist/tracking-gps-2.1.0.apk`. GitHub Actions chỉ chạy kiểm thử/debug compile và không cung cấp APK cập nhật chính thức. Xem quy trình backup/cập nhật tại `docs/stable-apk-update-runbook.md`.
 
 ## 4. Cap phat dien thoai
 
