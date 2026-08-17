@@ -18,7 +18,6 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import com.internal.tracker.MainActivity
 import com.internal.tracker.R
 import com.internal.tracker.TrackerApplication
@@ -99,7 +98,7 @@ class TrackingService : Service() {
                     val mode = container.trackingCoordinator.restore(
                         container.trackingPreferences.startedAt,
                     )
-                    registerLocationUpdates(priorityFor(mode))
+                    registerLocationUpdates(LocationPriorityPolicy.forMode(mode))
                     activityMonitor.register()
                 }.onFailure {
                     started = false
@@ -133,7 +132,7 @@ class TrackingService : Service() {
                 fixes.forEach { fix ->
                     runCatching {
                         val mode = container.trackingCoordinator.onFix(fix, inVehicle)
-                        registerLocationUpdates(priorityFor(mode))
+                        registerLocationUpdates(LocationPriorityPolicy.forMode(mode))
                     }.onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
                 }
             }
@@ -181,11 +180,6 @@ class TrackingService : Service() {
             PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
-
-    private fun priorityFor(mode: MovementMode): Int = when (mode) {
-        MovementMode.IDLE -> Priority.PRIORITY_BALANCED_POWER_ACCURACY
-        MovementMode.MOVING, MovementMode.STOP_CANDIDATE -> Priority.PRIORITY_HIGH_ACCURACY
-    }
 
     private fun createNotificationChannel() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
