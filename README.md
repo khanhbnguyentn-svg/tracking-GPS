@@ -25,7 +25,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-releas
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
 ```
 
-APK phân phối: `dist/tracking-gps-2.0.1.apk`. Debug APK chỉ dùng trong phát triển và không được dùng để cập nhật điện thoại. Quy trình signing, backup và cài update: `docs/stable-apk-update-runbook.md`.
+APK phân phối: `dist/tracking-gps-2.0.2.apk`. Debug APK chỉ dùng trong phát triển và không được dùng để cập nhật điện thoại. Quy trình signing, backup và cài update: `docs/stable-apk-update-runbook.md`.
 
 ## Su dung
 
