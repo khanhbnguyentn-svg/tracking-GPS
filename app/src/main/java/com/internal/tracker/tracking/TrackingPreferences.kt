@@ -28,4 +28,24 @@ class TrackingPreferences(context: Context) {
     var nextRunTime: Long
         get() = preferences.getLong("next_run", 0)
         set(value) = preferences.edit().putLong("next_run", value).apply()
+
+    var lastGpsCallbackAt: Long
+        get() = preferences.getLong("last_gps_callback", 0)
+        set(value) = preferences.edit().putLong("last_gps_callback", value).apply()
+
+    var recoveryCause: String?
+        get() = preferences.getString("recovery_cause", null)
+        set(value) = preferences.edit().putString("recovery_cause", value).apply()
+
+    var lastEmailAttemptTime: Long
+        get() = preferences.getLong("last_email_attempt", 0)
+        set(value) = preferences.edit().putLong("last_email_attempt", value).apply()
+
+    var consecutiveEmailFailures: Int
+        get() = preferences.getInt("consecutive_email_failures", 0)
+        set(value) = preferences.edit().putInt("consecutive_email_failures", value).apply()
+
+    var lastEmailFailure: String?
+        get() = preferences.getString("last_email_failure", null)
+        set(value) = preferences.edit().putString("last_email_failure", value).apply()
 }
