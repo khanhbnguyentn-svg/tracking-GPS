@@ -4,11 +4,12 @@ Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profil
 
 ## Cài đặt và quyền
 
-- [ ] Trên máy đang có `2.0.1 (3)`, cài đè `tracking-gps-2.0.2.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
-- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.0.2 (4)`.
+- [ ] Trên máy đang có `2.0.2 (4)`, cài đè `tracking-gps-2.0.3.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
+- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.0.3 (5)`.
 - [ ] Room History, số thiết bị, Gmail/email nhận, chu kỳ và PIN còn nguyên sau cập nhật.
-- [ ] Mở Settings bằng PIN tầng 2, bấm `Lưu và kiểm tra`; Gmail đăng nhập thành công trên bản 2.0.2.
+- [ ] Mở Settings bằng PIN tầng 2, bấm `Lưu và kiểm tra`; Gmail đăng nhập thành công trên bản 2.0.3.
 - [ ] Trạng thái tracking còn nguyên; sau khi mở app, foreground notification và kỳ báo cáo tiếp theo được reconcile.
+- [ ] Nếu tracking đang bật trước cập nhật, `MY_PACKAGE_REPLACED` tự phục hồi foreground service mà không cần reboot; nếu broadcast bị trì hoãn, mở app phục hồi service nhưng không thay lịch báo cáo.
 - [ ] Nếu gặp signature mismatch, dừng kiểm thử và bảo toàn package data; không gỡ app để thử lại.
 - [ ] Import file JSON dùng chung; xem trước đúng host, port, chu kỳ, scheme và TLS.
 - [ ] Lưu/chuyển profile trên máy; không có Device ID trong file JSON.
@@ -23,7 +24,7 @@ Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profil
 - [ ] Khóa màn hình 30 phút: vị trí vẫn cập nhật theo chu kỳ cấu hình.
 - [ ] Vuốt app khỏi recent apps: foreground tracking vẫn chạy hoặc app báo rõ nếu hãng dừng service.
 - [ ] Nút Stop trong app và notification dừng tracking; app không tự khởi động lại bằng WorkManager.
-- [ ] Khởi động lại điện thoại: xác nhận trạng thái rõ ràng; người dùng chủ động bắt đầu lại nếu service không chạy.
+- [ ] Khởi động lại điện thoại: tracking đang bật tự phục hồi foreground service và GPS sau khi user profile mở khóa; không cần bấm Start lại.
 - [ ] Khi tracking vẫn bật và xe đã dừng trên 2 phút, `dumpsys location` vẫn hiển thị request `HIGH_ACCURACY` mỗi 10 giây cho `com.internal.tracker`.
 - [ ] Di chuyển lại sau khi dừng trên 2 phút: app tạo `START` mới mà không cần mở lại app.
 
