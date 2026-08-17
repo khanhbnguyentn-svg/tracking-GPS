@@ -9,8 +9,10 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -18,14 +20,21 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.internal.tracker.MainActivity
 import com.internal.tracker.R
 import com.internal.tracker.TrackerApplication
+import com.internal.tracker.diagnostics.GpsGapDetector
+import com.internal.tracker.diagnostics.IntegrityDirective
+import com.internal.tracker.schedule.RecoveryCause
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,10 +44,13 @@ class TrackingService : Service() {
     private val processingMutex = Mutex()
     private lateinit var fusedLocation: FusedLocationProviderClient
     private lateinit var activityMonitor: VehicleActivityMonitor
+    private lateinit var locationManager: LocationManager
     private val container get() = (application as TrackerApplication).container
+    private var healthJob: Job? = null
     @Volatile private var currentPriority: Int? = null
     @Volatile private var started = false
     @Volatile private var inVehicle = false
+    @Volatile private var lastCallbackElapsed = 0L
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -49,6 +61,7 @@ class TrackingService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
+        locationManager = getSystemService(LocationManager::class.java)
         activityMonitor = VehicleActivityMonitor(this) { error ->
             container.trackingPreferences.lastError = error
         }
@@ -67,7 +80,7 @@ class TrackingService : Service() {
                 inVehicle = false
                 startTrackingIfEnabled()
             }
-            else -> startTrackingIfEnabled()
+            else -> startTrackingIfEnabled(consumeRecoveryCause(intent))
         }
         return START_STICKY
     }
@@ -75,31 +88,50 @@ class TrackingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        healthJob?.cancel()
         fusedLocation.removeLocationUpdates(locationCallback)
         activityMonitor.unregister()
         scope.cancel()
         super.onDestroy()
     }
 
-    private fun startTrackingIfEnabled() {
+    private fun consumeRecoveryCause(intent: Intent?): RecoveryCause? {
+        val stored = container.trackingPreferences.consumeRecoveryCause()
+        return stored?.let { runCatching { RecoveryCause.valueOf(it) }.getOrNull() }
+            ?: RecoveryCause.PROCESS_RECREATED.takeIf { intent == null }
+    }
+
+    private fun startTrackingIfEnabled(recoveryCause: RecoveryCause? = null) {
         if (!container.trackingPreferences.enabled) {
             stopSelf()
             return
         }
         if (started) {
             activityMonitor.register()
-            if (currentPriority != null) return
+            if (currentPriority == null) registerLocationUpdates(Priority.PRIORITY_HIGH_ACCURACY, force = true)
+            return
         }
         started = true
         scope.launch {
             processingMutex.withLock {
                 if (!container.trackingPreferences.enabled) return@withLock
                 runCatching {
-                    val mode = container.trackingCoordinator.restore(
+                    val state = container.trackingCoordinator.restore(
                         container.trackingPreferences.startedAt,
-                    ).mode
-                    registerLocationUpdates(LocationPriorityPolicy.forMode(mode))
+                    )
+                    val nowElapsed = SystemClock.elapsedRealtime()
+                    lastCallbackElapsed = nowElapsed
+                    container.trackingIntegrityMonitor.onRestoredMovement(state)
+                    container.trackingIntegrityMonitor.onStarted(
+                        trackingEnabled = true,
+                        nowWall = System.currentTimeMillis(),
+                        nowElapsed = nowElapsed,
+                        lastCallbackWall = container.trackingPreferences.lastGpsCallbackAt,
+                        condition = TrackingHealthPolicy.startupCondition(recoveryCause),
+                    )
+                    registerLocationUpdates(LocationPriorityPolicy.forMode(state.mode))
                     activityMonitor.register()
+                    startHealthChecks()
                 }.onFailure {
                     started = false
                     currentPriority = null
@@ -116,6 +148,8 @@ class TrackingService : Service() {
                     .onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
                 fusedLocation.removeLocationUpdates(locationCallback)
                 activityMonitor.unregister()
+                healthJob?.cancel()
+                healthJob = null
                 currentPriority = null
                 started = false
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -125,13 +159,19 @@ class TrackingService : Service() {
     }
 
     private fun process(locations: List<Location>) {
+        val receivedAt = System.currentTimeMillis()
+        val elapsedAt = SystemClock.elapsedRealtime()
+        lastCallbackElapsed = elapsedAt
+        container.trackingPreferences.lastGpsCallbackAt = receivedAt
         val fixes = locations.sortedBy(Location::getTime).map { it.toTrackingFix() }
         scope.launch {
             processingMutex.withLock {
                 if (!container.trackingPreferences.enabled) return@withLock
                 fixes.forEach { fix ->
                     runCatching {
+                        container.trackingIntegrityMonitor.onLocationReceived(fix, receivedAt, elapsedAt)
                         val outcome = container.trackingCoordinator.onFix(fix, inVehicle)
+                        container.trackingIntegrityMonitor.onMovementProcessed(outcome)
                         registerLocationUpdates(LocationPriorityPolicy.forMode(outcome.currentState.mode))
                     }.onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
                 }
@@ -149,8 +189,8 @@ class TrackingService : Service() {
     )
 
     @SuppressLint("MissingPermission")
-    private fun registerLocationUpdates(priority: Int) {
-        if (currentPriority == priority) return
+    private fun registerLocationUpdates(priority: Int, force: Boolean = false) {
+        if (!force && currentPriority == priority) return
         if (!hasLocationPermission()) {
             container.trackingPreferences.lastError = ERROR_LOCATION_PERMISSION_MISSING
             fusedLocation.removeLocationUpdates(locationCallback)
@@ -174,6 +214,33 @@ class TrackingService : Service() {
             container.trackingPreferences.lastError = ERROR_LOCATION_UPDATES_FAILED
         }
     }
+
+    private fun startHealthChecks() {
+        healthJob?.cancel()
+        healthJob = scope.launch {
+            while (isActive) {
+                delay(LOCATION_INTERVAL_MILLIS)
+                processingMutex.withLock {
+                    if (!started || !container.trackingPreferences.enabled) return@withLock
+                    val nowElapsed = SystemClock.elapsedRealtime()
+                    val directive = container.trackingIntegrityMonitor.onHealthTick(
+                        nowWall = System.currentTimeMillis(),
+                        nowElapsed = nowElapsed,
+                        condition = currentDeviceCondition(nowElapsed),
+                    )
+                    if (directive == IntegrityDirective.RE_REGISTER_LOCATION) {
+                        registerLocationUpdates(Priority.PRIORITY_HIGH_ACCURACY, force = true)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun currentDeviceCondition(nowElapsed: Long) = TrackingHealthPolicy.condition(
+        hasLocationPermission = hasLocationPermission(),
+        isLocationEnabled = locationManager.isLocationEnabled,
+        callbackGapOpen = nowElapsed - lastCallbackElapsed >= GpsGapDetector.GAP_THRESHOLD_MILLIS,
+    )
 
     private fun hasLocationPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==

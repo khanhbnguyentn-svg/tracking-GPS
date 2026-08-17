@@ -28,6 +28,7 @@ import com.internal.tracker.schedule.WorkManagerReportScheduler
 import com.internal.tracker.schedule.AppLaunchReconcilePolicy
 import com.internal.tracker.schedule.ReconcileAction
 import com.internal.tracker.schedule.ScheduleReceiverPolicy
+import com.internal.tracker.schedule.RecoveryCause
 import com.internal.tracker.history.RecordType
 import com.internal.tracker.tracking.MovementDetector
 import com.internal.tracker.tracking.TrackingCoordinator
@@ -110,6 +111,8 @@ class AppContainer(context: Context) {
     fun startTracking() {
         if (!trackingPreferences.enabled) {
             trackingPreferences.startedAt = System.currentTimeMillis()
+            trackingPreferences.lastGpsCallbackAt = 0
+            trackingPreferences.recoveryCause = null
             trackingPreferences.enabled = true
         }
         ContextCompat.startForegroundService(
@@ -126,8 +129,9 @@ class AppContainer(context: Context) {
         reconcileSchedule()
     }
 
-    fun reconcileTracking() {
+    fun reconcileTracking(cause: RecoveryCause? = null) {
         if (trackingPreferences.enabled) {
+            if (cause != null) trackingPreferences.recoveryCause = cause.name
             ContextCompat.startForegroundService(
                 appContext,
                 Intent(appContext, TrackingService::class.java).setAction(TrackingService.ACTION_START),
@@ -135,10 +139,10 @@ class AppContainer(context: Context) {
         }
     }
 
-    fun reconcileBackgroundWork() {
+    fun reconcileBackgroundWork(cause: RecoveryCause) {
         ScheduleReceiverPolicy.actions(trackingPreferences.enabled).forEach { action ->
             when (action) {
-                ReconcileAction.TRACKING -> reconcileTracking()
+                ReconcileAction.TRACKING -> reconcileTracking(cause)
                 ReconcileAction.SCHEDULE -> reconcileSchedule()
             }
         }
@@ -146,7 +150,7 @@ class AppContainer(context: Context) {
 
     fun reconcileAppLaunch() {
         if (ReconcileAction.TRACKING in AppLaunchReconcilePolicy.actions(trackingPreferences.enabled)) {
-            reconcileTracking()
+            reconcileTracking(RecoveryCause.APP_LAUNCH)
         }
     }
 

@@ -37,6 +37,13 @@ class TrackingPreferences(context: Context) {
         get() = preferences.getString("recovery_cause", null)
         set(value) = preferences.edit().putString("recovery_cause", value).apply()
 
+    @Synchronized
+    fun consumeRecoveryCause(): String? {
+        val cause = preferences.getString("recovery_cause", null)
+        preferences.edit().remove("recovery_cause").commit()
+        return cause
+    }
+
     var lastEmailAttemptTime: Long
         get() = preferences.getLong("last_email_attempt", 0)
         set(value) = preferences.edit().putLong("last_email_attempt", value).apply()
