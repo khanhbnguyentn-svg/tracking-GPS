@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -108,7 +109,7 @@ class AppDatabaseMigrationTest {
             .allowMainThreadQueries()
             .build()
 
-        assertEquals(1, room.locationRecordDao().count())
+        assertEquals(1, runBlocking { room.locationRecordDao().count() })
         room.openHelper.writableDatabase.query("SELECT COUNT(*) FROM diagnostic_incidents").use { cursor ->
             cursor.moveToFirst()
             assertEquals(0, cursor.getInt(0))
