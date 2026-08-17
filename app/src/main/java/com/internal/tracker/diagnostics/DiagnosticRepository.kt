@@ -2,10 +2,15 @@ package com.internal.tracker.diagnostics
 
 import java.util.UUID
 
+interface DiagnosticReportStore {
+    suspend fun pendingBundle(limit: Int): DiagnosticBundle
+    suspend fun markReported(ids: List<String>, reportedAt: Long)
+}
+
 class DiagnosticRepository(
     private val store: DiagnosticStore,
     private val incidentIds: () -> String = { UUID.randomUUID().toString() },
-) {
+) : DiagnosticReportStore {
     suspend fun incident(id: String) = store.incident(id)
     suspend fun openIncident(type: IncidentType) = store.openIncident(type)
 
@@ -90,7 +95,7 @@ class DiagnosticRepository(
         return incident
     }
 
-    suspend fun pendingBundle(limit: Int): DiagnosticBundle {
+    override suspend fun pendingBundle(limit: Int): DiagnosticBundle {
         val incidents = store.pendingForReport(limit)
         val samples = if (incidents.isEmpty()) emptyList() else store.samplesFor(incidents.map { it.incidentId })
         return DiagnosticBundle(incidents, samples)
@@ -119,7 +124,7 @@ class DiagnosticRepository(
         )
     }
 
-    suspend fun markReported(ids: List<String>, reportedAt: Long) {
+    override suspend fun markReported(ids: List<String>, reportedAt: Long) {
         ids.forEach { id -> update(id) { it.copy(reportedAt = reportedAt) } }
     }
 

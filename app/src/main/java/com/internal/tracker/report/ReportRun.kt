@@ -6,13 +6,13 @@ data class ReportRunResult(val sent: Int, val error: String?)
 
 class ReportRun(
     private val cleanup: suspend () -> Unit,
-    private val deliver: suspend () -> DeliveryOutcome,
+    private val deliver: suspend (scheduledFor: Long) -> DeliveryOutcome,
     private val scheduleNext: () -> Unit,
 ) {
-    suspend fun execute(): ReportRunResult {
+    suspend fun execute(scheduledFor: Long): ReportRunResult {
         val cleanupFailure = runCatching { cleanup() }.exceptionOrNull()
         return try {
-            runCatching { deliver() }.fold(
+            runCatching { deliver(scheduledFor) }.fold(
                 onSuccess = { delivery ->
                     ReportRunResult(
                         sent = delivery.sent,

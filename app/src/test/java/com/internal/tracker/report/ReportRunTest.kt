@@ -11,12 +11,12 @@ class ReportRunTest {
         val events = mutableListOf<String>()
         val run = ReportRun(
             cleanup = { events += "cleanup" },
-            deliver = { events += "mail"; DeliveryOutcome(3, 0, null) },
+            deliver = { scheduledFor -> events += "mail:$scheduledFor"; DeliveryOutcome(3, 0, 0, 0, null) },
             scheduleNext = { events += "schedule" },
         )
 
-        assertEquals(3, run.execute().sent)
-        assertEquals(listOf("cleanup", "mail", "schedule"), events)
+        assertEquals(3, run.execute(100_000).sent)
+        assertEquals(listOf("cleanup", "mail:100000", "schedule"), events)
     }
 
     @Test
@@ -24,15 +24,15 @@ class ReportRunTest {
         val events = mutableListOf<String>()
         val run = ReportRun(
             cleanup = { events += "cleanup"; error("CLEANUP_FAILED") },
-            deliver = { events += "mail"; DeliveryOutcome(2, 0, null) },
+            deliver = { scheduledFor -> events += "mail:$scheduledFor"; DeliveryOutcome(2, 0, 0, 0, null) },
             scheduleNext = { events += "schedule" },
         )
 
-        val result = run.execute()
+        val result = run.execute(100_000)
 
         assertEquals(2, result.sent)
         assertEquals("CLEANUP_FAILED", result.error)
-        assertEquals(listOf("cleanup", "mail", "schedule"), events)
+        assertEquals(listOf("cleanup", "mail:100000", "schedule"), events)
     }
 
     @Test
@@ -40,14 +40,14 @@ class ReportRunTest {
         val events = mutableListOf<String>()
         val run = ReportRun(
             cleanup = { events += "cleanup"; error("CLEANUP_FAILED") },
-            deliver = { events += "mail"; error("MAIL_FAILED") },
+            deliver = { scheduledFor -> events += "mail:$scheduledFor"; error("MAIL_FAILED") },
             scheduleNext = { events += "schedule" },
         )
 
-        val result = run.execute()
+        val result = run.execute(100_000)
 
         assertEquals(0, result.sent)
         assertEquals("MAIL_FAILED", result.error)
-        assertEquals(listOf("cleanup", "mail", "schedule"), events)
+        assertEquals(listOf("cleanup", "mail:100000", "schedule"), events)
     }
 }

@@ -36,7 +36,7 @@ interface DiagnosticDao : DiagnosticStore {
     @Query("SELECT * FROM diagnostic_samples WHERE incidentId IN (:incidentIds) ORDER BY incidentId, sequence")
     override suspend fun samplesFor(incidentIds: List<String>): List<DiagnosticSample>
 
-    @Query("DELETE FROM diagnostic_incidents WHERE openedAt < :before AND reportedAt IS NULL")
+    @Query("DELETE FROM diagnostic_incidents WHERE openedAt < :before")
     override suspend fun deleteIncidentsBefore(before: Long)
 
     @Query("DELETE FROM diagnostic_samples WHERE incidentId IN (SELECT incidentId FROM diagnostic_incidents WHERE reportedAt IS NOT NULL AND reportedAt < :before)")

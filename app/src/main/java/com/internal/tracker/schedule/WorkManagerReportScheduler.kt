@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.Data
+import androidx.work.workDataOf
 import com.internal.tracker.report.ReportWorker
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
@@ -15,6 +17,7 @@ class WorkManagerReportScheduler(context: Context, private val onScheduled: (Lon
         enqueue = { time ->
             val delay = (time.toInstant().toEpochMilli() - System.currentTimeMillis()).coerceAtLeast(0)
             val request = OneTimeWorkRequestBuilder<ReportWorker>()
+                .setInputData(ScheduledReportWork.inputData(time.toInstant().toEpochMilli()))
                 .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                 .build()
             workManager.enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.REPLACE, request)
@@ -27,4 +30,8 @@ class WorkManagerReportScheduler(context: Context, private val onScheduled: (Lon
         scheduler.reconcile(enabled, intervalHours, deviceNumber)
 
     companion object { const val UNIQUE_NAME = "scheduled-location-report" }
+}
+
+object ScheduledReportWork {
+    fun inputData(scheduledFor: Long): Data = workDataOf(ReportWorker.KEY_SCHEDULED_FOR to scheduledFor)
 }

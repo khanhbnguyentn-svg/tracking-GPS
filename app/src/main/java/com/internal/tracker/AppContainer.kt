@@ -12,7 +12,6 @@ import com.internal.tracker.config.DeviceIdProvider
 import com.internal.tracker.config.EncryptedPilotConfigStore
 import com.internal.tracker.config.EncryptedPinPreferences
 import com.internal.tracker.data.AppDatabase
-import com.internal.tracker.diagnostics.DiagnosticAlertScheduler
 import com.internal.tracker.diagnostics.DiagnosticAlertDelivery
 import com.internal.tracker.diagnostics.DiagnosticRepository
 import com.internal.tracker.diagnostics.EventSequenceValidator
@@ -40,6 +39,7 @@ import com.internal.tracker.tracking.TrackingService
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 @Suppress("DEPRECATION")
 class AppContainer(context: Context) {
@@ -94,19 +94,31 @@ class AppContainer(context: Context) {
     )
     private val delivery = ReportDelivery(
         history = database.locationRecordDao(),
+        diagnostics = diagnostics,
         config = pilotConfig::load,
+        deviceId = deviceId::get,
+        telemetry = trackingPreferences,
         appVersion = BuildConfig.VERSION_NAME,
         sender = gmail,
         refreshBackup = ::refreshBackups,
     )
     val reportRun = ReportRun(
         cleanup = {
-            history.deleteOlderThan(LocalDate.now(ZoneId.systemDefault()).minusYears(1))
+            val zone = ZoneId.systemDefault()
+            val summaryBefore = LocalDate.now(zone).minusYears(1)
+                .atStartOfDay(zone).toInstant().toEpochMilli()
+            val samplesBefore = Instant.now().minus(30, ChronoUnit.DAYS).toEpochMilli()
+            val routeFailure = runCatching {
+                history.deleteOlderThan(LocalDate.now(zone).minusYears(1))
+            }.exceptionOrNull()
+            val diagnosticFailure = runCatching {
+                diagnostics.cleanup(summaryBefore, samplesBefore)
+            }.exceptionOrNull()
+            (routeFailure ?: diagnosticFailure)?.let { throw it }
         },
-        deliver = {
-            delivery.deliverPending().also { outcome ->
+        deliver = { scheduledFor ->
+            delivery.deliverPending(scheduledFor).also { outcome ->
                 trackingPreferences.lastError = outcome.publicError
-                if (outcome.sent > 0) trackingPreferences.lastSendTime = System.currentTimeMillis()
             }
         },
         scheduleNext = ::reconcileSchedule,

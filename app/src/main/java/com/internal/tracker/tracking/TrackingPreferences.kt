@@ -1,8 +1,10 @@
 package com.internal.tracker.tracking
 
 import android.content.Context
+import com.internal.tracker.mail.DeliveryTelemetry
+import com.internal.tracker.mail.DeliveryTelemetryStore
 
-class TrackingPreferences(context: Context) {
+class TrackingPreferences(context: Context) : DeliveryTelemetryStore {
     private val preferences = context.getSharedPreferences("tracking_state", Context.MODE_PRIVATE)
 
     var enabled: Boolean
@@ -55,4 +57,31 @@ class TrackingPreferences(context: Context) {
     var lastEmailFailure: String?
         get() = preferences.getString("last_email_failure", null)
         set(value) = preferences.edit().putString("last_email_failure", value).apply()
+
+    override fun snapshot() = DeliveryTelemetry(
+        lastAttemptAt = lastEmailAttemptTime,
+        lastSuccessAt = lastSendTime,
+        consecutiveFailures = consecutiveEmailFailures,
+        lastFailure = lastEmailFailure,
+    )
+
+    @Synchronized
+    override fun accepted(at: Long) {
+        preferences.edit()
+            .putLong("last_email_attempt", at)
+            .putLong("last_send", at)
+            .putInt("consecutive_email_failures", 0)
+            .remove("last_email_failure")
+            .commit()
+    }
+
+    @Synchronized
+    override fun failed(at: Long, category: String) {
+        val failures = preferences.getInt("consecutive_email_failures", 0) + 1
+        preferences.edit()
+            .putLong("last_email_attempt", at)
+            .putInt("consecutive_email_failures", failures)
+            .putString("last_email_failure", category)
+            .commit()
+    }
 }

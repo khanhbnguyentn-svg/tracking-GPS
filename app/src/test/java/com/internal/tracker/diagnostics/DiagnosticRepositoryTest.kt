@@ -76,6 +76,18 @@ class DiagnosticRepositoryTest {
         assertEquals(1, store.samplesFor(listOf("unreported-recent")).size)
     }
 
+    @Test
+    fun reportedIncidentSummaryIsDeletedAfterOneYearBoundary() = runTest {
+        val store = FakeDiagnosticStore()
+        val repository = DiagnosticRepository(store)
+        repository.save(incident("reported-expired", 100), listOf(sample("reported-expired", 0)))
+        repository.markReported(listOf("reported-expired"), reportedAt = 200)
+
+        repository.cleanup(summaryBefore = 800, reportedSamplesBefore = 10_000)
+
+        assertNull(repository.incident("reported-expired"))
+    }
+
     private fun incident(id: String, openedAt: Long) = DiagnosticIncident(
         incidentId = id,
         type = IncidentType.SUSPECTED_GPS_JUMP,
@@ -136,7 +148,7 @@ private class FakeDiagnosticStore : DiagnosticStore {
         .sortedWith(compareBy(DiagnosticSample::incidentId, DiagnosticSample::sequence))
 
     override suspend fun deleteIncidentsBefore(before: Long) {
-        val ids = incidents.values.filter { it.openedAt < before && it.reportedAt == null }.map { it.incidentId }
+        val ids = incidents.values.filter { it.openedAt < before }.map { it.incidentId }
         ids.forEach(incidents::remove)
         samples.removeAll { it.incidentId in ids }
     }
