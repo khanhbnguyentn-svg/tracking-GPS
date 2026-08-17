@@ -79,6 +79,43 @@ class AppDatabaseMigrationTest {
         room.close()
     }
 
+    @Test
+    fun migrationThreeToFourPreservesRoutesAndCreatesDiagnosticTables() {
+        context.deleteDatabase(DATABASE_NAME)
+        context.openOrCreateDatabase(DATABASE_NAME, Context.MODE_PRIVATE, null).use { database ->
+            database.execSQL(
+                """
+                CREATE TABLE location_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, deviceNumber TEXT NOT NULL,
+                    deviceId TEXT NOT NULL, capturedAt INTEGER NOT NULL, timezone TEXT NOT NULL,
+                    latitude REAL NOT NULL, longitude REAL NOT NULL, accuracy REAL,
+                    batteryPercent INTEGER, trackedDurationMillis INTEGER NOT NULL,
+                    source TEXT NOT NULL, state TEXT NOT NULL, attemptCount INTEGER NOT NULL,
+                    lastError TEXT, sentAt INTEGER, recordType TEXT NOT NULL,
+                    isFinalized INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            database.execSQL("CREATE INDEX index_location_records_capturedAt ON location_records (capturedAt)")
+            database.execSQL("CREATE INDEX index_location_records_state ON location_records (state)")
+            database.execSQL("CREATE INDEX index_location_records_source ON location_records (source)")
+            database.execSQL("INSERT INTO location_records VALUES (1,'001','AND-1',1000,'Asia/Bangkok',10.0,20.0,5.0,80,60000,'CURRENT','PENDING',0,NULL,NULL,'START',1)")
+            database.version = 3
+        }
+
+        val room = Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .allowMainThreadQueries()
+            .build()
+
+        assertEquals(1, room.locationRecordDao().count())
+        room.openHelper.writableDatabase.query("SELECT COUNT(*) FROM diagnostic_incidents").use { cursor ->
+            cursor.moveToFirst()
+            assertEquals(0, cursor.getInt(0))
+        }
+        room.close()
+    }
+
     private companion object {
         const val DATABASE_NAME = "migration-v2-v3.db"
     }
