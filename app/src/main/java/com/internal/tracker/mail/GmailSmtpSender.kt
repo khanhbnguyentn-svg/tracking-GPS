@@ -34,10 +34,12 @@ class GmailSmtpSender : MailSender {
             setContent(
                 MimeMultipart().apply {
                     addBodyPart(MimeBodyPart().apply { setText(message.body, Charsets.UTF_8.name()) })
-                    addBodyPart(MimeBodyPart().apply {
-                        dataHandler = DataHandler(ByteArrayDataSource(message.attachment, "text/csv; charset=UTF-8"))
-                        fileName = message.attachmentName
-                    })
+                    message.attachments.forEach { attachment ->
+                        addBodyPart(MimeBodyPart().apply {
+                            dataHandler = DataHandler(ByteArrayDataSource(attachment.bytes, attachment.contentType))
+                            fileName = attachment.name
+                        })
+                    }
                 },
             )
             saveChanges()

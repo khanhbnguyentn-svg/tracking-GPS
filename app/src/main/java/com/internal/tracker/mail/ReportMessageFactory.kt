@@ -7,12 +7,19 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+data class MailAttachment(
+    val name: String,
+    val contentType: String,
+    val bytes: ByteArray,
+)
+
 data class ReportMessage(
     val subject: String,
     val body: String,
-    val attachmentName: String,
-    val attachment: ByteArray,
-    val recordIds: List<Long>,
+    val attachments: List<MailAttachment>,
+    val recordIds: List<Long> = emptyList(),
+    val incidentIds: List<String> = emptyList(),
+    val reportId: String? = null,
 )
 
 object ReportMessageFactory {
@@ -33,8 +40,11 @@ object ReportMessageFactory {
                 Vi tri moi nhat: https://maps.google.com/?q=${latest.latitude},${latest.longitude}
                 Phien ban ung dung: $appVersion
             """.trimIndent(),
-            attachmentName = "GPS-${config.deviceNumber}-$sentAt.csv".replace(':', '-').replace(' ', '_'),
-            attachment = LocationCsv.encode(records).toByteArray(Charsets.UTF_8),
+            attachments = listOf(MailAttachment(
+                name = "GPS-${config.deviceNumber}-$sentAt.csv".replace(':', '-').replace(' ', '_'),
+                contentType = "text/csv; charset=UTF-8",
+                bytes = LocationCsv.encode(records).toByteArray(Charsets.UTF_8),
+            )),
             recordIds = records.map(LocationRecord::id),
         )
     }

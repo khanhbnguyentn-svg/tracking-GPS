@@ -15,6 +15,9 @@ class ReportMessageFactoryTest {
         assertTrue(message.body.contains("AND-1"))
         assertTrue(message.body.contains("https://maps.google.com/?q=10.5,20.25"))
         assertEquals(listOf(1L), message.recordIds)
+        assertEquals(1, message.attachments.size)
+        assertTrue(message.attachments.single().name.endsWith(".csv"))
+        assertEquals("text/csv; charset=UTF-8", message.attachments.single().contentType)
     }
 
     private fun config() = PilotConfig("001", "pic@example.com", 6, "sender@gmail.com", "abcdefghijklmnop")
