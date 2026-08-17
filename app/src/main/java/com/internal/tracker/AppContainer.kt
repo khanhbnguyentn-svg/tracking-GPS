@@ -13,11 +13,13 @@ import com.internal.tracker.config.EncryptedPilotConfigStore
 import com.internal.tracker.config.EncryptedPinPreferences
 import com.internal.tracker.data.AppDatabase
 import com.internal.tracker.diagnostics.DiagnosticAlertScheduler
+import com.internal.tracker.diagnostics.DiagnosticAlertDelivery
 import com.internal.tracker.diagnostics.DiagnosticRepository
 import com.internal.tracker.diagnostics.EventSequenceValidator
 import com.internal.tracker.diagnostics.GpsGapDetector
 import com.internal.tracker.diagnostics.TrackingIntegrityMonitor
 import com.internal.tracker.diagnostics.TrajectoryAnomalyDetector
+import com.internal.tracker.diagnostics.WorkManagerDiagnosticAlertScheduler
 import com.internal.tracker.export.DailyCsvStore
 import com.internal.tracker.history.LocationHistoryRepository
 import com.internal.tracker.mail.GmailSmtpSender
@@ -65,16 +67,23 @@ class AppContainer(context: Context) {
 
     val history = LocationHistoryRepository(database.locationRecordDao())
     val diagnostics = DiagnosticRepository(database.diagnosticDao())
+    val csv = DailyCsvStore(appContext)
+    val gmail = GmailSmtpSender()
+    private val diagnosticAlertScheduler = WorkManagerDiagnosticAlertScheduler(appContext)
+    val diagnosticAlertDelivery = DiagnosticAlertDelivery(
+        repository = diagnostics,
+        config = pilotConfig::load,
+        sender = gmail,
+        appVersion = BuildConfig.VERSION_NAME,
+    )
     val trackingIntegrityMonitor = TrackingIntegrityMonitor(
         gapDetector = GpsGapDetector(),
         trajectoryDetector = TrajectoryAnomalyDetector(),
         sequenceValidator = EventSequenceValidator(),
         repository = diagnostics,
-        alertScheduler = DiagnosticAlertScheduler { _, _ -> },
+        alertScheduler = diagnosticAlertScheduler,
         onError = { trackingPreferences.lastError = it },
     )
-    val csv = DailyCsvStore(appContext)
-    val gmail = GmailSmtpSender()
     private val battery = BatteryReader(appContext)
     private val reportScheduler = WorkManagerReportScheduler(appContext) { trackingPreferences.nextRunTime = it }
     val trackingCoordinator = TrackingCoordinator(

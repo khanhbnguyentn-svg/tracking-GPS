@@ -96,6 +96,11 @@ class DiagnosticRepository(
         return DiagnosticBundle(incidents, samples)
     }
 
+    suspend fun bundle(id: String): DiagnosticBundle {
+        val incident = store.incident(id) ?: return DiagnosticBundle(emptyList(), emptyList())
+        return DiagnosticBundle(listOf(incident), store.samplesFor(listOf(id)))
+    }
+
     suspend fun markOpenedResult(id: String, acceptedAt: Long?, error: String?) = update(id) {
         it.copy(
             openedAlertState = if (error == null) DiagnosticDeliveryState.ACCEPTED else DiagnosticDeliveryState.FAILED,
