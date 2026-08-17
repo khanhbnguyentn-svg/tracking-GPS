@@ -15,7 +15,7 @@ class TrackingCoordinator(
     private val mutex = Mutex()
     private var state = MovementState()
 
-    suspend fun restore(startedAt: Long): MovementMode = mutex.withLock {
+    suspend fun restore(startedAt: Long): MovementState = mutex.withLock {
         val candidate = history.activeStopCandidate(startedAt)
         val latest = history.latestSince(startedAt)
         state = when {
@@ -38,14 +38,15 @@ class TrackingCoordinator(
                 lastStoredAt = latest.capturedAt,
             )
         }
-        state.mode
+        state
     }
 
-    suspend fun onFix(fix: TrackingFix, inVehicle: Boolean): MovementMode = mutex.withLock {
+    suspend fun onFix(fix: TrackingFix, inVehicle: Boolean): TrackingOutcome = mutex.withLock {
+        val previous = state
         val transition = detector.onFix(state, fix, inVehicle)
         state = transition.state
-        execute(transition.actions)
-        state.mode
+        val persisted = execute(transition.actions)
+        TrackingOutcome(previous, state, persisted)
     }
 
     suspend fun stop() = mutex.withLock {
@@ -54,12 +55,13 @@ class TrackingCoordinator(
         execute(transition.actions)
     }
 
-    private suspend fun execute(actions: List<MovementAction>) {
+    private suspend fun execute(actions: List<MovementAction>): List<PersistedMovementAction> = buildList {
         actions.forEach { action ->
             when (action) {
                 is MovementAction.Insert -> {
                     val id = persist(action.fix, action.type, action.finalized)
                     onPersisted(action.fix)
+                    add(PersistedMovementAction.Inserted(id, action.type, action.finalized))
                     if (action.type == RecordType.TEMP_STOP && !action.finalized) {
                         state = detector.attachCandidateId(state, id)
                     }
@@ -68,7 +70,7 @@ class TrackingCoordinator(
                 is MovementAction.FinalizeCandidate -> history.finalizeStopCandidate(
                     action.recordId,
                     action.type,
-                )
+                ).also { add(PersistedMovementAction.Finalized(action.recordId, action.type)) }
             }
         }
     }
@@ -82,3 +84,21 @@ class TrackingCoordinator(
         speedMetersPerSecond = null,
     )
 }
+
+sealed interface PersistedMovementAction {
+    val type: RecordType
+
+    data class Inserted(
+        val recordId: Long,
+        override val type: RecordType,
+        val finalized: Boolean,
+    ) : PersistedMovementAction
+
+    data class Finalized(val recordId: Long, override val type: RecordType) : PersistedMovementAction
+}
+
+data class TrackingOutcome(
+    val previousState: MovementState,
+    val currentState: MovementState,
+    val actions: List<PersistedMovementAction>,
+)

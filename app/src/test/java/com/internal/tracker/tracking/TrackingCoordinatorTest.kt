@@ -40,7 +40,7 @@ class TrackingCoordinatorTest {
         val candidateId = store.insert(record(at = 20_000, RecordType.TEMP_STOP, finalized = false))
         val coordinator = coordinator(store)
 
-        assertEquals(MovementMode.STOP_CANDIDATE, coordinator.restore(startedAt = 1_000))
+        assertEquals(MovementMode.STOP_CANDIDATE, coordinator.restore(startedAt = 1_000).mode)
         coordinator.onFix(fix(140_000, speedMps = 0.0), inVehicle = false)
 
         assertEquals(1, store.rows.size)
@@ -74,6 +74,26 @@ class TrackingCoordinatorTest {
         coordinator.onFix(fix(12_000, speedMps = 2.0), inVehicle = false)
 
         assertEquals(listOf(2_000L), persisted.map { it.capturedAt })
+    }
+
+    @Test
+    fun returnsPersistedInsertAndFinalizeOutcomes() = runTest {
+        val store = FakeTrackingStore()
+        val coordinator = coordinator(store)
+        coordinator.restore(startedAt = 1_000)
+
+        val start = coordinator.onFix(fix(2_000, speedMps = 2.0), inVehicle = true)
+        assertEquals(
+            PersistedMovementAction.Inserted(1L, RecordType.START, true),
+            start.actions.single(),
+        )
+        coordinator.onFix(fix(10_000, speedMps = 0.0), inVehicle = false)
+        val stop = coordinator.onFix(fix(130_000, speedMps = 0.0), inVehicle = false)
+        assertEquals(
+            PersistedMovementAction.Finalized(2L, RecordType.STOP),
+            stop.actions.single(),
+        )
+        assertEquals(MovementMode.IDLE, stop.currentState.mode)
     }
 
     private fun coordinator(

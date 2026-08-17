@@ -97,7 +97,7 @@ class TrackingService : Service() {
                 runCatching {
                     val mode = container.trackingCoordinator.restore(
                         container.trackingPreferences.startedAt,
-                    )
+                    ).mode
                     registerLocationUpdates(LocationPriorityPolicy.forMode(mode))
                     activityMonitor.register()
                 }.onFailure {
@@ -131,8 +131,8 @@ class TrackingService : Service() {
                 if (!container.trackingPreferences.enabled) return@withLock
                 fixes.forEach { fix ->
                     runCatching {
-                        val mode = container.trackingCoordinator.onFix(fix, inVehicle)
-                        registerLocationUpdates(LocationPriorityPolicy.forMode(mode))
+                        val outcome = container.trackingCoordinator.onFix(fix, inVehicle)
+                        registerLocationUpdates(LocationPriorityPolicy.forMode(outcome.currentState.mode))
                     }.onFailure { container.trackingPreferences.lastError = ERROR_PERSIST_FAILED }
                 }
             }
