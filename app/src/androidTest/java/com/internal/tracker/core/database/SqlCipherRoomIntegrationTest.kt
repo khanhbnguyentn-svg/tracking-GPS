@@ -14,38 +14,40 @@ import kotlinx.coroutines.runBlocking
 @RunWith(AndroidJUnit4::class)
 class SqlCipherRoomIntegrationTest {
     @Test
-    fun encryptedDatabaseReopensWithSameKeyAndRejectsWrongKey() = runBlocking {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val name = "sqlcipher-probe-${UUID.randomUUID()}.db"
-        val key = ByteArray(32) { it.toByte() }
+    fun encryptedDatabaseReopensWithSameKeyAndRejectsWrongKey() {
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val name = "sqlcipher-probe-${UUID.randomUUID()}.db"
+            val key = ByteArray(32) { it.toByte() }
 
-        try {
-            val writableDatabase = open(context, name, key)
             try {
-                writableDatabase.probeDao().insert(EncryptionProbeEntity(1, "secret"))
-            } finally {
-                writableDatabase.close()
-            }
-
-            val readableDatabase = open(context, name, key)
-            try {
-                assertEquals("secret", readableDatabase.probeDao().value(1))
-            } finally {
-                readableDatabase.close()
-            }
-
-            assertThrows(Exception::class.java) {
-                val wrongKeyDatabase = open(context, name, ByteArray(32) { 7 })
+                val writableDatabase = open(context, name, key)
                 try {
-                    wrongKeyDatabase.openHelper.writableDatabase.query(
-                        "SELECT value FROM encryption_probe WHERE id = 1",
-                    ).use { cursor -> cursor.moveToFirst() }
+                    writableDatabase.probeDao().insert(EncryptionProbeEntity(1, "secret"))
                 } finally {
-                    wrongKeyDatabase.close()
+                    writableDatabase.close()
                 }
+
+                val readableDatabase = open(context, name, key)
+                try {
+                    assertEquals("secret", readableDatabase.probeDao().value(1))
+                } finally {
+                    readableDatabase.close()
+                }
+
+                assertThrows(Exception::class.java) {
+                    val wrongKeyDatabase = open(context, name, ByteArray(32) { 7 })
+                    try {
+                        wrongKeyDatabase.openHelper.writableDatabase.query(
+                            "SELECT value FROM encryption_probe WHERE id = 1",
+                        ).use { cursor -> cursor.moveToFirst() }
+                    } finally {
+                        wrongKeyDatabase.close()
+                    }
+                }
+            } finally {
+                context.deleteDatabase(name)
             }
-        } finally {
-            context.deleteDatabase(name)
         }
     }
 
