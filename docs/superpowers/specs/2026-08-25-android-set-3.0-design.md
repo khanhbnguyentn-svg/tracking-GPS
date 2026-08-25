@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-25
 
-**Status:** Approved design baseline pending final document review
+**Status:** Approved design baseline
 
 **Release:** `3.0.0` (`versionCode 7`)
 
