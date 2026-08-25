@@ -187,20 +187,25 @@ class DatabasePassphraseStoreTest {
         val firstStore = AndroidDatabasePassphraseStore(
             DatabasePassphraseManager(slot, wrapper, firstSource, codec),
         )
+        val secondReachedLockBoundary = CountDownLatch(1)
+        val releaseSecondAtLockBoundary = CountDownLatch(1)
         val secondStore = AndroidDatabasePassphraseStore(
             DatabasePassphraseManager(slot, wrapper, secondSource, codec),
+            beforeLockAcquisition = {
+                secondReachedLockBoundary.countDown()
+                check(releaseSecondAtLockBoundary.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    "Timed out waiting to release the second caller at the lock boundary"
+                }
+            },
         )
         val executor = Executors.newFixedThreadPool(2)
 
         try {
             val firstResult = executor.submit<DatabaseKeyResult> { firstStore.getOrCreate() }
             assertTrue(slot.firstReadCaptured.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
-            val secondWorkerStarted = CountDownLatch(1)
-            val secondResult = executor.submit<DatabaseKeyResult> {
-                secondWorkerStarted.countDown()
-                secondStore.getOrCreate()
-            }
-            assertTrue(secondWorkerStarted.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            val secondResult = executor.submit<DatabaseKeyResult> { secondStore.getOrCreate() }
+            assertTrue(secondReachedLockBoundary.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            releaseSecondAtLockBoundary.countDown()
 
             val secondEnteredBeforeFirstCompleted =
                 slot.secondReadCaptured.await(CONCURRENT_ENTRY_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
@@ -216,6 +221,7 @@ class DatabasePassphraseStoreTest {
             assertEquals(0, secondSource.callCount.get())
             assertEquals(1, slot.writeCount.get())
         } finally {
+            releaseSecondAtLockBoundary.countDown()
             slot.releaseFirstRead.countDown()
             executor.shutdownNow()
             assertTrue(executor.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS))

@@ -14,11 +14,15 @@ import javax.crypto.spec.GCMParameterSpec
 
 class AndroidDatabasePassphraseStore internal constructor(
     private val delegate: DatabasePassphraseStore,
+    private val beforeLockAcquisition: () -> Unit = {},
 ) : DatabasePassphraseStore {
     constructor(context: Context) : this(createDelegate(context.applicationContext))
 
-    override fun getOrCreate(): DatabaseKeyResult = synchronized(PROCESS_LOCK) {
-        delegate.getOrCreate()
+    override fun getOrCreate(): DatabaseKeyResult {
+        beforeLockAcquisition()
+        return synchronized(PROCESS_LOCK) {
+            delegate.getOrCreate()
+        }
     }
 
     private companion object {
