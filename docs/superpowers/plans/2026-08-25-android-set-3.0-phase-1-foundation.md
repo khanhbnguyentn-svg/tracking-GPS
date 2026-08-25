@@ -708,6 +708,49 @@ git commit -m "test: verify encrypted Room database integration"
 
 ---
 
+### Task 6A: Restore API 26 location-status compatibility
+
+**Why this task was added:** Task 1 lowered `minSdk` from 29 to the approved baseline 26. Full lint in Task 6 then exposed two pre-existing direct calls to `LocationManager.isLocationEnabled`, an API 28 method. The Phase 1 build cannot be lint-clean on API 26 until both call sites use the AndroidX compatibility boundary already present in the project.
+
+**Files:**
+
+- Modify: `app/src/main/java/com/internal/tracker/ui/TrackerApp.kt`
+- Modify: `app/src/main/java/com/internal/tracker/tracking/TrackingService.kt`
+
+**Interfaces:**
+
+- Consumes: existing `androidx.core:core` 1.17.0 and Android `LocationManager`.
+- Produces: identical location-enabled semantics through `LocationManagerCompat.isLocationEnabled(locationManager)` on API 26+.
+
+- [ ] **Step 1: Verify the compatibility regression is red**
+
+```powershell
+.\gradlew.bat :app:lintDebug --no-daemon
+```
+
+Expected: FAIL with exactly the two `NewApi` errors for direct `LocationManager.isLocationEnabled` calls in `TrackerApp.kt` and `TrackingService.kt`.
+
+- [ ] **Step 2: Apply the minimal AndroidX compatibility fix**
+
+Import `androidx.core.location.LocationManagerCompat` and replace only the two direct API 28 property calls with `LocationManagerCompat.isLocationEnabled(...)`. Do not change tracking policy, UI behavior, permissions, or service lifecycle.
+
+- [ ] **Step 3: Run focused lint and the full JVM suite**
+
+```powershell
+.\gradlew.bat :app:lintDebug :app:testDebugUnitTest --no-daemon
+```
+
+Expected: PASS. Existing warnings may remain, but there must be no lint errors.
+
+- [ ] **Step 4: Commit**
+
+```powershell
+git add app/src/main/java/com/internal/tracker/ui/TrackerApp.kt app/src/main/java/com/internal/tracker/tracking/TrackingService.kt
+git commit -m "fix: support location status on API 26"
+```
+
+---
+
 ### Task 7: Assemble the Phase 1 platform module
 
 **Files:**
