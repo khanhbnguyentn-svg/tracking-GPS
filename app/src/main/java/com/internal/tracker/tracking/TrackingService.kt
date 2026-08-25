@@ -15,6 +15,7 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -238,7 +239,7 @@ class TrackingService : Service() {
 
     private fun currentDeviceCondition(nowElapsed: Long) = TrackingHealthPolicy.condition(
         hasLocationPermission = hasLocationPermission(),
-        isLocationEnabled = locationManager.isLocationEnabled,
+        isLocationEnabled = LocationManagerCompat.isLocationEnabled(locationManager),
         callbackGapOpen = nowElapsed - lastCallbackElapsed >= GpsGapDetector.GAP_THRESHOLD_MILLIS,
     )
 

@@ -11,6 +11,7 @@ import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.location.LocationManagerCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -520,7 +521,7 @@ private fun permissionSnapshot(activity: Activity, fineRequested: Boolean, refre
     val fine = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED
     return PermissionSnapshot(
-        activity.getSystemService(LocationManager::class.java).isLocationEnabled,
+        LocationManagerCompat.isLocationEnabled(activity.getSystemService(LocationManager::class.java)),
         fine,
         ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
             PackageManager.PERMISSION_GRANTED,
