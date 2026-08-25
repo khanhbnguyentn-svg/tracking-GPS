@@ -1,0 +1,612 @@
+# ANDROID SET — TECHNICAL BUILD SPECIFICATION
+
+Technical implementation baseline for Vehicle Usage Management System SRS 1.2.
+
+| Item | Value |
+|---|---|
+| Version | 1.2 |
+| Date | 2026-08-25 |
+| Android release | 3.0.0 (`versionCode 7`) |
+| Application ID | `com.internal.tracker` |
+| Scope | Android SET + email contract fixtures |
+| Design reference | `docs/superpowers/specs/2026-08-25-android-set-3.0-design.md` |
+
+## Change log
+
+- 1.0: initial Android build proposal.
+- 1.1: Vendor-specific gateway selection and failover.
+- 1.2: clean Android 3.0 baseline with always-on 10-second raw GPS, explicit Trip references, portable vehicle context, Fixed User, revised PIN/expense/email/storage/Maintenance behavior, and approved technology decisions.
+
+## 0. Document authority and use
+
+This specification supplements, but does not replace, SRS 1.2. SRS defines business behavior; this file pins Android architecture, schema, state, protocol, and verification detail. The approved design reference explains rationale and operational trade-offs.
+
+Implementation shall proceed feature by feature with tests first. No implementation agent may reinterpret a numeric threshold or security/business rule already fixed here. Backend-only features remain out of scope for Android 3.0.
+
+## 1. Release and platform
+
+```text
+versionName = 3.0.0
+versionCode = 7
+applicationId = com.internal.tracker
+minSdk = 26
+compileSdk = 36
+targetSdk = 36
+Java toolchain = 17
+```
+
+Clean install is allowed for 3.0.0 and migration from app 2.1.0 is not required. Keep the existing package ID and release signing identity. Database schema starts at version 1 for the 3.x product line. Every later schema change requires an explicit non-destructive migration.
+
+Technology baseline:
+
+- Kotlin, coroutines, StateFlow;
+- Jetpack Compose + Material 3 + Navigation Compose;
+- ViewModel and lifecycle-aware state collection;
+- Room + SQLCipher + WAL;
+- Android Keystore;
+- FusedLocationProviderClient;
+- location foreground service;
+- WorkManager for persistent eligible background execution;
+- JavaMail Android port over SMTPS;
+- manual feature-scoped dependency composition;
+- JUnit, AndroidX Test, Room instrumented tests, and golden contract fixtures.
+
+Google Maps is not included. Android Geocoder is best-effort UI enrichment only.
+
+## 2. Source architecture
+
+Use one Gradle `app` module and bounded packages:
+
+```text
+com.internal.tracker
+├── core
+│   ├── audit
+│   ├── database
+│   ├── device
+│   ├── security
+│   └── time
+├── tracking
+├── trip
+├── identity
+├── vehicle
+├── expense
+├── mail
+├── maintenance
+└── ui
+```
+
+Dependency direction is UI -> domain/use case -> repository -> infrastructure. Domain logic must not import Compose, Android UI, DAO implementation, or JavaMail. ViewModels never call DAO/SMTP directly.
+
+Required injectable abstractions include `BusinessClock`, `UuidSource`, `LocationSource`, `DeviceIdentitySource`, `FileStager`, `MailTransport`, `WorkScheduler`, and `StorageProbe`.
+
+Use durable intent/state for external side effects. A Room transaction can atomically create a Trip and mail intent, but cannot atomically send SMTP or write an external file. Workers claim eligible durable work and record every transition.
+
+## 3. Encrypted database
+
+### 3.1 Opening and keys
+
+On first launch:
+
+1. generate a random SQLCipher passphrase;
+2. wrap it with an Android Keystore AES key;
+3. persist only wrapped material;
+4. open Room with SQLCipher;
+5. enable WAL and foreign keys.
+
+Never invoke destructive fallback. A failed unwrap/open transitions to a blocking Recovery state while preserving files.
+
+### 3.2 Entities
+
+#### Device and configuration
+
+`device_identity`
+
+```text
+id singleton PK
+device_id UNIQUE
+android_id_hash_source_version
+created_at
+last_verified_at
+```
+
+`app_configuration`
+
+```text
+id singleton PK
+business_timezone = Asia/Ho_Chi_Minh
+tracking_pause_state
+tracking_pause_until nullable
+tracking_pause_reason nullable
+active_vehicle_binding_id nullable FK
+current_master_version nullable
+```
+
+`boot_session`
+
+```text
+boot_session_id PK
+started_at_utc
+started_elapsed_realtime_nanos
+reason [PROCESS_START|BOOT|PACKAGE_REPLACED]
+```
+
+#### Raw tracking
+
+`gps_raw_sample`
+
+```text
+id INTEGER PK AUTOINCREMENT
+sequence_number INTEGER UNIQUE NOT NULL
+captured_at_utc INTEGER NOT NULL
+captured_at_device_offset_minutes INTEGER NOT NULL
+elapsed_realtime_nanos INTEGER NOT NULL
+latitude REAL NOT NULL
+longitude REAL NOT NULL
+altitude_m REAL nullable
+horizontal_accuracy_m REAL nullable
+vertical_accuracy_m REAL nullable
+speed_mps REAL nullable
+speed_accuracy_mps REAL nullable
+bearing_deg REAL nullable
+bearing_accuracy_deg REAL nullable
+provider TEXT nullable
+is_mock INTEGER NOT NULL
+boot_session_id TEXT NOT NULL FK
+sample_kind [ORDINARY|START_BOUNDARY|END_BOUNDARY]
+vehicle_binding_id nullable FK
+```
+
+Indexes: unique sequence, capture time, `(vehicle_binding_id, captured_at_utc)`, and boot session/time. Ordinary persistence enforces one sample per ten-second window in repository policy; boundary samples are explicit exceptions.
+
+`tracking_incident`
+
+```text
+incident_id PK
+type [GPS_GAP|PERMISSION|PROVIDER|SERVICE|CLOCK_CHANGE]
+opened_at
+closed_at nullable
+trip_segment_id nullable
+email_opened_sent_at nullable
+email_recovered_sent_at nullable
+details_code
+```
+
+`movement_event`
+
+```text
+event_id PK
+type [TEMP_STOP_STARTED|TEMP_STOP_ENDED|RESUME]
+effective_at
+confirmed_at
+first_raw_sequence
+confirming_raw_sequence
+algorithm_version
+```
+
+#### Vehicle and Trip
+
+`vehicle_binding`
+
+```text
+binding_id PK
+declared_plate_number
+declared_vendor_id
+declared_vehicle_type nullable
+note nullable
+effective_from
+effective_to nullable
+change_reason nullable
+source [INITIAL|DRIVER_CHANGE|TRIP_CHANGE|RESET_SETUP]
+```
+
+`journey`
+
+```text
+journey_id PK
+created_at
+status
+purpose nullable
+```
+
+`trip_segment`
+
+```text
+trip_segment_id PK
+journey_id FK
+vehicle_binding_id FK
+trip_type [FIXED_USER|SINGLE_TRIP|DRIVER_INITIATED|HISTORICAL]
+status
+start_action_at
+end_action_at nullable
+declared_end_at nullable
+email_delivery_state
+pin_validity_state
+created_at
+version
+```
+
+Use a partial/guarded uniqueness strategy enforced transactionally so only one `IN_PROGRESS` segment exists.
+
+`trip_boundary_capture`
+
+```text
+boundary_id PK
+trip_segment_id FK
+type [START|END]
+action_at
+fix_captured_at nullable
+raw_sequence nullable
+latency_ms nullable
+accuracy_m nullable
+status [CAPTURED|UNAVAILABLE]
+```
+
+`trip_gps_reference`
+
+```text
+trip_segment_id PK/FK
+range_start
+range_end
+first_sequence nullable
+last_sequence nullable
+start_to_first_sample_ms nullable
+last_sample_to_end_ms nullable
+```
+
+`trip_user_snapshot` stores Driver declaration and User-confirmed identity in separate columns/JSON value objects plus `identity_mismatch`.
+
+`trip_adjustment_request` stores immutable original reference, type, requested interval, reason, purpose, identity versions, confirmation state, status, and version.
+
+#### Identity and calendar
+
+`master_package_version` stores package/schema/key versions, hash, imported time, result, and source filename.
+
+`fixed_user` stores employee ID, name, department, PIN hash, PIN ciphertext, and master version. Fixed PIN unique constraint applies within active master import validation.
+
+`daily_pin_context` stores effective business date, PIN hash, encrypted PIN, created/scheduled/sent times, and retention needed for 48-hour confirmation.
+
+`business_calendar_day` stores local date, type `[HOLIDAY|WORKING_OVERRIDE]`, name, and master version.
+
+`maintenance_pin` singleton stores hash, encrypted representation where operationally required, and master version. Maintenance PIN is never revealable.
+
+#### Expense and confirmation
+
+`expense` stores segment, type, amount in integer minor currency units, note, optional receipt URI, created/updated timestamps, lock time, and current version.
+
+`expense_version` is immutable and stores full snapshot plus source `[DRIVER_COMPLETE|SYSTEM_DEADLINE_SEND]`.
+
+`confirmation` stores segment, method `[FIXED_PIN|DAILY_PIN|BACKEND_EMAIL]`, confirmed identity snapshot, confirmed time, and status.
+
+#### Mail and audit
+
+`email_queue_item` stores logical Message ID, type, priority, message/business version, eligible time, state, attempt count, next retry, active gateway snapshot, package snapshot reference, and last categorized error.
+
+`message_snapshot` stores canonical manifest metadata, source entity versions, file hashes, payload size, part metadata, and integrity key version. It enables deterministic retry/resend after staged ZIP deletion.
+
+`email_transmission` stores unique Transmission ID, Message ID, gateway account/version, started/completed times, SMTP result/category, and server-safe diagnostic code.
+
+`gateway_account` and `gateway_state` store encrypted credentials, role, Vendor, catalog version, failure counters, cooldown, health-check time, and failover/failback audit metadata.
+
+`audit_log`, `maintenance_log`, `storage_cleanup_event`, and `recovery_export_record` are append-only.
+
+### 3.3 Transaction rules
+
+- Business change and audit insert share one transaction.
+- Journey vehicle change closes/opens segment and binding in one transaction.
+- Master import validates in memory/staging, then replaces active master atomically.
+- Creating an outbound business version and queue intent is atomic.
+- Candidate file creation is outside Room; state changes to ready only after atomic temp-file move and hash verification.
+
+## 4. Always-on tracking implementation
+
+### 4.1 Service
+
+`AlwaysOnTrackingService` is a location foreground service using a persistent notification channel. It uses sticky/reconciliation behavior appropriate to each API level. Boot/package/app-launch reconcilers ensure expected tracking returns when Android permits.
+
+No Driver/User stop action exists. Maintenance pause is persisted, audited, and explicitly visible.
+
+### 4.2 Sampling
+
+Request high-accuracy location at approximately ten seconds. `RawLocationRecorder` rejects an ordinary persistence attempt already represented in the current ten-second monotonic window. It never changes the Location values.
+
+At Start/End, `BoundaryCaptureManager` records action time and starts a separate high-accuracy burst at about one second for at most ten seconds. First suitable fresh fix is inserted with boundary kind. UI action completes immediately.
+
+### 4.3 Movement state machine
+
+State is `MOVING`, `STOP_CANDIDATE`, or `TEMP_STOP`.
+
+- Enter candidate at speed below 1 m/s.
+- Candidate anchor is the first raw sample.
+- Cancel if speed/radius condition fails before 60 seconds.
+- Confirm after at least 60 seconds with all observed points within 20 m.
+- Store effective start at anchor time and separate confirmation time.
+- Exit after two consecutive samples at least 1 m/s or outside anchor radius.
+
+Keep a bounded rolling buffer only. Persist movement events, not intermediate candidate samples beyond the already persisted raw rows.
+
+### 4.4 Health
+
+Every ten seconds, health policy compares expected tracking state with latest callback. At 30 seconds open a local incident and re-register location. Repeat recovery registration no more aggressively than a fixed safe cadence. During Trip, schedule email alert at five-minute open duration. Outside Trip, notify locally only.
+
+## 5. Device ID and time
+
+Device ID is SHA-256 over stable Android ID plus application identity and a versioned domain separator. Encode a human-operable shortened display only in Maintenance; outbound data uses the full stable value. Store and verify cached identity but do not silently replace it.
+
+Use UTC epoch for persistence, `elapsedRealtimeNanos` for monotonic comparison, and `Asia/Ho_Chi_Minh` for Daily PIN, expense deadline, History, and retention boundaries. Device timezone change never rewrites stored deadlines.
+
+## 6. Master Package
+
+Package envelope contains algorithm/key/schema/package versions, nonce, ciphertext, and RSA-PSS signature.
+
+Import order:
+
+1. read through ContentResolver with a bounded file-size policy;
+2. verify envelope/schema fields;
+3. verify RSA-PSS SHA-256 signature with embedded public key;
+4. decrypt AES-256-GCM using app-shared key;
+5. parse canonical JSON;
+6. validate package version is greater than active;
+7. validate every Fixed User and unique Fixed PIN;
+8. validate calendar dates/overrides;
+9. validate Maintenance PIN and gateway catalog updates;
+10. commit full replacement atomically;
+11. audit result without secret/PIN values.
+
+Plaintext staging exists only in bounded memory or private temporary storage and is deleted immediately.
+
+## 7. PIN implementation
+
+Use salted PBKDF2-HMAC-SHA256 with an approved iteration count benchmarked on API 26 hardware. Store encrypted plaintext only where Maintenance reveal/business email requires it. PIN reveal uses Maintenance re-auth, `FLAG_SECURE`, disabled copy, and 30-second auto-hide.
+
+Daily PIN generation is idempotent by business date. A unique DB constraint prevents two contexts for one SET/date. At service/worker/app reconciliation, create any missing current-date context exactly once and enqueue the 00:00 scheduled message with original effective date.
+
+Cooldown state is per namespace, monotonic where possible, and persists across process restart.
+
+## 8. Business Calendar and History
+
+`BusinessCalendar` evaluates weekend defaults plus signed override rows.
+
+- Workday today: `[today, previousWorkday(1), previousWorkday(2)]`.
+- Non-workday today: three immediately preceding workdays.
+- History query includes full Trip whose start local date belongs to this set.
+- Raw query for Adjustment is constrained to the visible calendar window and at most 48 hours.
+
+Daily PIN confirmation window is exactly 48 elapsed hours. Expense uses stored absolute deadline calculated as start of local date `endDate + 2`.
+
+## 9. Trip state and flows
+
+`TripStateMachine` permits only documented transitions. Trip email state is separate.
+
+Real-time Start stores user and vehicle snapshots plus action boundary. End preserves actual action time; an earlier declared End does not shorten retained evidence through actual End.
+
+Historical Trip accepts explicit start/end no longer than 48 hours, rejects overlaps and duplicates, and creates references only to raw rows inside the interval. It never obtains external bracketing rows or creates coordinates.
+
+Driver Initiated confirmation stores Driver and User identity separately. Fixed path uses master identity. Single Trip path uses the Daily PIN for Trip start date plus self-declared identity. After 48 hours only backend/PIC completion remains.
+
+Vehicle change during Trip uses one Room transaction to close/open binding and physical segment under the same Journey. Failed transaction leaves the old segment active.
+
+## 10. Estimated Distance
+
+Calculate a versioned UI estimate from raw rows inside the interval:
+
+- Haversine between consecutive rows;
+- add only derived-moving segments;
+- do not bridge gaps over 60 seconds;
+- exclude implied speed over 200 km/h;
+- store excluded segment count and algorithm version;
+- never update/delete excluded raw samples.
+
+Label all UI values as estimated. Do not send it as official backend distance.
+
+## 11. Expense implementation
+
+At End calculate `initial_trip_send_at = end_action_at + 1 hour` and `expense_lock_at = startOfDay(endLocalDate + 2)`.
+
+Expense is editable after End until lock. Initial package snapshots current expenses at its build boundary. Later Save modifies local draft; **Hoan tat expense** creates an immutable Expense Version and queue intent. A deadline worker/reconciler creates `SYSTEM_DEADLINE_SEND` if dirty state remains. Clock/reboot reconciliation uses stored absolute deadline and idempotent version guards.
+
+Use integer minor currency units, never binary floating point.
+
+## 12. Email package serialization
+
+Normal Trip ZIP:
+
+```text
+manifest.json
+trip.csv
+gps_raw.csv
+expenses.csv
+```
+
+CSV uses UTF-8, comma delimiter, RFC 4180 quoting, dot decimal, `\n` canonical line ending for hashing, and explicit null representation as empty field. Headers and field order are schema-versioned and deterministic. Timestamp columns use ISO-8601 UTC plus separate offset where required.
+
+`gps_raw.csv` contains exact raw values and sequences inside the inclusive Trip range. No movement events or outside coordinates are serialized.
+
+Build files in private staging with temp-then-atomic-move. Compute per-file SHA-256, construct canonical manifest, compute HMAC-SHA256, then ZIP. Verify ZIP size/hash before queue state becomes ready.
+
+Cap ZIP at 15 MiB. Multipart splits raw data only between complete ordered rows. Each part declares group ID, part/count, time/sequence range, and hash. Backend staging semantics are represented in golden fixtures.
+
+## 13. Queue and SMTP
+
+Priorities:
+
+```text
+0 DAILY_PIN_UPDATE
+1 POST_TRIP_CONFIRMATION
+2 TRIP_PACKAGE
+3 EXPENSE_UPDATE
+4 HEALTH_CHECK_OR_DIAGNOSTIC
+```
+
+Claim one eligible item per Gmail account transactionally. A delayed item does not block later eligible work. Limit consecutive high-priority sends to prevent starvation.
+
+SMTP uses `smtps.gmail.com`, port 465, SSL/authentication, bounded connect/read/write timeouts, and App Password. Never log session properties containing secrets.
+
+Categorize results before policy:
+
+- `AUTHENTICATION_OR_DISABLED`: failover after two failures;
+- `RATE_LIMIT_OR_QUOTA`: failover after three failures in one hour;
+- `NETWORK_OFFLINE`, `DNS`, `TIMEOUT`: retry, no gateway penalty;
+- `TLS_OR_SYSTEM_TIME`: device/infrastructure warning, no failover;
+- `INVALID_PACKAGE`, `TOO_LARGE`: terminal package error, no failover.
+
+Four Vendor catalogs each contain two Primaries and one Backup. Stable assignment selects Primary A/B. Backup is sticky after failover. Schedule one small Primary health-check after 24 hours; success returns to Primary, failure schedules another check 24 hours later.
+
+SMTP success deletes staged ZIP after recording successful Transmission and logical state. Preserve message snapshot/source versions for deterministic resend.
+
+## 14. Idempotency and message contract
+
+`message_id` identifies logical content/version. `transmission_id` identifies an SMTP attempt. Retry/resend without content change preserves Message ID and bytes. A new business snapshot increments the relevant version and creates a new Message ID.
+
+Manifest includes message/device/vehicle/app/tracking/GPS/boundary/storage/gateway/hash/integrity fields enumerated in the design reference. It excludes secrets, hardware serial/IMEI, unauthorized PIN, and GPS outside Trip.
+
+Contract fixtures must cover every message type, duplicate, old version, corruption, multipart, and privacy boundary.
+
+## 15. UI screens
+
+Home provides:
+
+- Fixed User;
+- Single Trip;
+- Driver Area;
+- Maintenance;
+- active Trip card;
+- GPS/network/email/storage status;
+- permission/gateway/master warnings.
+
+There is no tracking-stop button.
+
+Fixed flow: PIN -> identity review -> Current Location -> Start -> Active -> End confirmation -> Summary.
+
+Single flow: Daily PIN + personal declaration -> period -> Current Location -> Start -> Active -> End -> Summary.
+
+Driver flow: pre-enter User/Purpose -> Start -> End -> pending confirmation -> Fixed or Single confirmation.
+
+History uses three working days and maximum 48-hour selection. It displays time and Estimated Distance without map.
+
+Current Location panel uses best-effort Geocoder. Failure shows coordinate/accuracy fallback and permits Start after warning.
+
+Maintenance is visible but PIN-gated. Sensitive actions re-authenticate.
+
+## 16. Maintenance, recovery, and reset
+
+Maintenance functions:
+
+- device/GPS/storage/queue diagnostics;
+- Fixed/current-relevant Daily PIN reveal;
+- Master Package import;
+- SMTP test;
+- selected/full-year Recovery export;
+- tracking pause/resume;
+- Reset/Re-provision.
+
+Recovery export:
+
+1. stream selected Room data into canonical archive;
+2. generate random AES-256-GCM key/nonce;
+3. encrypt archive;
+4. wrap content key using backend RSA-OAEP SHA-256 public key;
+5. write manifest, hashes, Device ID, range, schema/version, audit reference;
+6. atomic move and read-back/hash verification;
+7. record export result.
+
+Reset is disabled until a full export verifies. It requires Maintenance re-auth and final Device ID fragment confirmation. It removes business/raw/queue/master/vehicle state, preserves Device ID and reset lineage, recreates encrypted DB, resumes tracking, and requires setup.
+
+## 17. Storage cleanup
+
+Probe app-visible filesystem free bytes and database/WAL/staging sizes.
+
+- `NORMAL`: at least 500 MiB free.
+- `WARNING`: below 500 MiB; notify and include telemetry.
+- `CRITICAL`: below 200 MiB; select oldest deletable whole business day.
+- Stop cleanup once at least 200 MiB is free.
+
+Before deletion, exclude raw ranges referenced by active/unfinished Trip, unsent message snapshot, pending confirmation, unresolved Adjustment, or active Recovery. Audit range/count/bytes and run in bounded transactions to avoid long database blocking.
+
+## 18. Security controls
+
+- `allowBackup=false`.
+- Disable cleartext traffic.
+- Export only launcher activity and components strictly required by Android.
+- Use scoped/private file storage and FileProvider for deliberate export.
+- Never log PINs, SMTP/HMAC/AES secrets, database passphrase, private keys, or full private coordinates.
+- Release builds retain JavaMail/MIME classes required by R8.
+- Bundled gateway, HMAC, and shared Master AES secrets are accepted operational risks and documented as extractable.
+- Master RSA private key and Recovery RSA private key never enter APK/source.
+
+## 19. Verification matrix
+
+### JVM tests
+
+- Trip/Journey transitions and one-active-segment guard.
+- Vehicle change transaction plan.
+- TEMP_STOP 60 seconds/20 m/1 m/s and two-sample Resume.
+- Boundary timing and unavailable state.
+- Daily PIN idempotency, midnight, 08:30 exception, cooldown.
+- 48-hour confirmation.
+- Business Calendar and three-workday History.
+- Expense one-hour snapshot, deadline, dirty fallback, versions.
+- Historical overlap/range/privacy.
+- Estimated Distance and gap/spike exclusions.
+- Queue priority/fairness/idempotency.
+- SMTP classification, failover, 24-hour failback.
+- CSV/manifest/hash/HMAC/golden fixtures.
+- Storage thresholds and protection rules.
+
+### Instrumented tests
+
+- SQLCipher create/reopen/wrong-key recovery behavior.
+- Foreign keys, unique guards, atomic business/audit rollback.
+- Master import full atomicity and downgrade rejection.
+- Retention and emergency cleanup.
+- Representative 3,153,600-row insert/query/export performance.
+- Process interruption around queue and file staging.
+
+### Device acceptance
+
+API 26, 29, 31, 33, and 35/36:
+
+- permission onboarding and degraded operation;
+- foreground tracking, reboot, package update, process kill;
+- one ordinary raw row per ten-second window;
+- Start/End boundary burst;
+- GPS off/on and Trip-only email alert;
+- no email of out-of-Trip GPS;
+- vehicle change segments;
+- offline email backlog/recovery;
+- Gmail auth/quota failover/failback;
+- clock/timezone changes;
+- storage warnings/cleanup;
+- Recovery export and Reset with stable Device ID;
+- signed release update retention for releases after 3.0;
+- separate confirmation of worker execution and mailbox receipt.
+
+## 20. Build and release gates
+
+The release script shall run, at minimum:
+
+```text
+:app:testDebugUnitTest
+:app:lintDebug
+:app:assembleRelease
+```
+
+It shall verify application ID, version name/code, signing certificate, APK signature, checksum, and non-overwrite policy. Official signed APK is stored outside Git. Credentials, signing stores, local SDK paths, device exports, and diagnostics are ignored.
+
+Release 3.0.0 passes only when unit/lint/release build, contract fixtures, encrypted database tests, and required physical-device acceptance have fresh evidence.
+
+## 21. Recommended implementation order
+
+1. Project/release baseline and test harness.
+2. Core time, Device ID, cryptography, encrypted Room skeleton.
+3. Raw GPS schema/repository and always-on foreground service.
+4. Movement/health/boundary capture.
+5. Vehicle binding, Journey, Trip state machines.
+6. Master Package, Fixed User, Daily/Maintenance PIN, Business Calendar.
+7. History/Historical Trip/Adjustment and Estimated Distance.
+8. Expense versions/deadlines.
+9. Deterministic package contract and golden fixtures.
+10. Durable priority queue, Gmail transport, gateway failover/failback.
+11. Compose screens and navigation.
+12. Maintenance, Recovery, Reset, storage cleanup.
+13. Full integration, capacity, device, and signed release verification.
+
