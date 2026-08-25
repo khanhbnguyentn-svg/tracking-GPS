@@ -4,9 +4,9 @@ import java.util.Base64
 
 class PassphraseEnvelopeCodec {
     fun encode(envelope: PassphraseEnvelope): String {
-        validate(envelope.version, envelope.iv.size, envelope.ciphertext.size)
         val iv = envelope.iv
         val ciphertext = envelope.ciphertext
+        validate(envelope.version, iv.size, ciphertext.size)
         val bytes = ByteArray(HEADER_SIZE + iv.size + ciphertext.size)
         bytes[0] = envelope.version.toByte()
         bytes[1] = iv.size.toByte()
@@ -17,6 +17,7 @@ class PassphraseEnvelopeCodec {
     }
 
     fun decode(encoded: String): PassphraseEnvelope {
+        require(encoded.length <= MAX_ENCODED_LENGTH) { "Passphrase envelope exceeds maximum encoded length" }
         val bytes = try {
             Base64.getDecoder().decode(encoded)
         } catch (exception: IllegalArgumentException) {
@@ -67,5 +68,7 @@ class PassphraseEnvelopeCodec {
         const val MAX_CIPHERTEXT_LENGTH = 1024
         const val HEADER_SIZE = 6
         const val BYTE_MASK = 0xff
+        const val MAX_ENVELOPE_LENGTH = HEADER_SIZE + IV_LENGTH + MAX_CIPHERTEXT_LENGTH
+        const val MAX_ENCODED_LENGTH = ((MAX_ENVELOPE_LENGTH + 2) / 3) * 4
     }
 }

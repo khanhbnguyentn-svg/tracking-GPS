@@ -64,28 +64,73 @@ class PassphraseEnvelopeCodecTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
+    fun `rejects malformed Base64`() {
+        codec.decode("not a Base64 envelope")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejects Base64 longer than the maximum envelope representation`() {
+        val oversized = Base64.getEncoder().encodeToString(ByteArray(6 + 12 + 1024 + 3))
+
+        codec.decode(oversized)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
     fun `rejects unknown decoded envelope version`() {
-        codec.decode(envelopeBytes(version = 2, ivLength = 12, ciphertextLength = 17))
+        codec.decode(rawEnvelopeBytes(version = 2, ivLength = 12, ciphertextLength = 17))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun `rejects decoded iv length other than twelve`() {
-        codec.decode(envelopeBytes(version = 1, ivLength = 11, ciphertextLength = 17))
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 11, ciphertextLength = 17))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun `rejects decoded ciphertext below minimum`() {
-        codec.decode(envelopeBytes(version = 1, ivLength = 12, ciphertextLength = 16))
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 16))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun `rejects decoded ciphertext above maximum`() {
-        codec.decode(envelopeBytes(version = 1, ivLength = 12, ciphertextLength = 1025))
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 1025))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejects header with truncated iv`() {
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 17, body = ByteArray(11)))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejects header with truncated ciphertext`() {
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 17, body = ByteArray(12 + 16)))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejects unsigned thirty two bit ciphertext length`() {
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 0xffffffffL))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejects signed minimum ciphertext length`() {
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 0x80000000L))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `rejects signed maximum ciphertext length`() {
+        codec.decode(rawEnvelopeBytes(version = 1, ivLength = 12, ciphertextLength = 0x7fffffffL))
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun `rejects trailing bytes`() {
-        codec.decode(envelopeBytes(version = 1, ivLength = 12, ciphertextLength = 17, trailing = byteArrayOf(99)))
+        codec.decode(
+            rawEnvelopeBytes(
+                version = 1,
+                ivLength = 12,
+                ciphertextLength = 17,
+                body = ByteArray(12 + 17),
+                trailing = byteArrayOf(99),
+            ),
+        )
     }
 
     @Test
@@ -104,18 +149,18 @@ class PassphraseEnvelopeCodecTest {
         assertArrayEquals(ByteArray(17) { 8 }, envelope.ciphertext)
     }
 
-    private fun envelopeBytes(
+    private fun rawEnvelopeBytes(
         version: Int,
         ivLength: Int,
-        ciphertextLength: Int,
+        ciphertextLength: Number,
+        body: ByteArray = byteArrayOf(),
         trailing: ByteArray = byteArrayOf(),
     ): String {
-        val bytes = ByteBuffer.allocate(6 + ivLength + ciphertextLength + trailing.size)
+        val bytes = ByteBuffer.allocate(6 + body.size + trailing.size)
             .put(version.toByte())
             .put(ivLength.toByte())
-            .putInt(ciphertextLength)
-            .put(ByteArray(ivLength))
-            .put(ByteArray(ciphertextLength))
+            .putInt(ciphertextLength.toInt())
+            .put(body)
             .put(trailing)
             .array()
         return Base64.getEncoder().encodeToString(bytes)
