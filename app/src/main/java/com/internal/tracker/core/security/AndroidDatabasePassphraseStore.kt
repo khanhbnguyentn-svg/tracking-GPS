@@ -12,16 +12,28 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class AndroidDatabasePassphraseStore(context: Context) : DatabasePassphraseStore {
-    private val secureRandom = SecureRandom()
-    private val delegate = DatabasePassphraseManager(
-        slot = SharedPreferencesPassphraseEnvelopeSlot(context.applicationContext),
-        wrapper = AndroidKeystorePassphraseWrapper(secureRandom),
-        byteSource = SecureByteSource { size -> ByteArray(size).also(secureRandom::nextBytes) },
-        codec = PassphraseEnvelopeCodec(),
-    )
+class AndroidDatabasePassphraseStore internal constructor(
+    private val delegate: DatabasePassphraseStore,
+) : DatabasePassphraseStore {
+    constructor(context: Context) : this(createDelegate(context.applicationContext))
 
-    override fun getOrCreate(): DatabaseKeyResult = delegate.getOrCreate()
+    override fun getOrCreate(): DatabaseKeyResult = synchronized(PROCESS_LOCK) {
+        delegate.getOrCreate()
+    }
+
+    private companion object {
+        val PROCESS_LOCK = Any()
+
+        fun createDelegate(context: Context): DatabasePassphraseStore {
+            val secureRandom = SecureRandom()
+            return DatabasePassphraseManager(
+                slot = SharedPreferencesPassphraseEnvelopeSlot(context),
+                wrapper = AndroidKeystorePassphraseWrapper(secureRandom),
+                byteSource = SecureByteSource { size -> ByteArray(size).also(secureRandom::nextBytes) },
+                codec = PassphraseEnvelopeCodec(),
+            )
+        }
+    }
 }
 
 private class SharedPreferencesPassphraseEnvelopeSlot(context: Context) : PassphraseEnvelopeSlot {
@@ -46,7 +58,6 @@ private class SharedPreferencesPassphraseEnvelopeSlot(context: Context) : Passph
 private class AndroidKeystorePassphraseWrapper(
     private val secureRandom: SecureRandom,
 ) : PassphraseWrapper {
-    @Synchronized
     override fun wrap(plaintext: ByteArray): PassphraseEnvelope {
         val keyStore = loadKeyStore()
         val key = if (keyStore.containsAlias(KEY_ALIAS)) {
@@ -70,7 +81,6 @@ private class AndroidKeystorePassphraseWrapper(
         }
     }
 
-    @Synchronized
     override fun unwrap(envelope: PassphraseEnvelope): ByteArray {
         val key = requireExistingKey(loadKeyStore())
         val iv = envelope.iv
