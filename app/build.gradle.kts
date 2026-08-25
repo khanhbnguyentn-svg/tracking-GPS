@@ -53,10 +53,10 @@ android {
 
     defaultConfig {
         applicationId = "com.internal.tracker"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "2.1.0"
+        versionCode = 7
+        versionName = "3.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SMTP_USER", quoted(smtpUser))
         buildConfigField("String", "SMTP_APP_PASSWORD", quoted(smtpAppPassword))
@@ -112,6 +112,8 @@ dependencies {
     implementation(libs.androidx.compose.icons)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.sqlite)
+    implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.security)
