@@ -1,9 +1,12 @@
 # Android SET 3.0 Design
 
-**Date:** 2026-08-25  
-**Status:** Approved design baseline pending final document review  
-**Release:** `3.0.0` (`versionCode 7`)  
-**Application ID:** `com.internal.tracker`  
+**Date:** 2026-08-25
+
+**Status:** Approved design baseline pending final document review
+
+**Release:** `3.0.0` (`versionCode 7`)
+
+**Application ID:** `com.internal.tracker`
 **Scope:** Android SET and email contract fixtures only
 
 ## 1. Purpose
@@ -495,4 +498,3 @@ Before implementation planning, update SRS and Android Technical Build Spec to r
 - clean 3.0 scope and later backend package builder.
 
 These changes should advance both documents to version 1.2 and remove superseded or contradictory rules instead of leaving parallel interpretations.
-
