@@ -6,7 +6,7 @@
 
 **Architecture:** Add new `core` packages beside the existing email-pilot code so each commit continues to compile. Phase 1 does not wire the new database into the old `AppContainer`; it proves the new encryption and platform interfaces through isolated unit/instrumented tests. Later phases consume these exact interfaces and create the production schema/composition root.
 
-**Tech Stack:** Kotlin 2.2.10, AGP 8.13.0, Java 17, Room 2.8.4, SQLCipher for Android 4.18.0, AndroidX SQLite 2.7.0, Android Keystore, JUnit 4, AndroidX Test.
+**Tech Stack:** Kotlin 2.2.10, AGP 8.13.0, Java 17, Room 2.8.4, SQLCipher for Android 4.17.0, AndroidX SQLite 2.7.0, Android Keystore, JUnit 4, AndroidX Test.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-android-set-3.0-design.md`
 
@@ -21,6 +21,7 @@
 - Never invoke destructive database fallback or delete a database because Keystore unwrap/open failed.
 - Phase 1 must not rewrite the old tracking/UI/report code; it adds isolated foundation code that later plans replace deliberately.
 - Dependency pins are based on the official [Room release page](https://developer.android.com/jetpack/androidx/releases/room), [AndroidX SQLite release page](https://developer.android.com/jetpack/androidx/releases/sqlite), and [Zetetic SQLCipher Community integration](https://www.zetetic.net/sqlcipher/sqlcipher-for-android-community/).
+- SQLCipher is pinned to `4.17.0`: its published AAR metadata is compatible with compile SDK 36; `4.18.0` requires compile SDK 37 and is outside this release's approved toolchain.
 
 ---
 
@@ -109,7 +110,7 @@ class ProjectConfigTest {
         assertTrue(appBuild.contains("versionCode = 7"))
         assertTrue(appBuild.contains("versionName = \"3.0.0\""))
         assertTrue(catalog.contains("room = \"2.8.4\""))
-        assertTrue(catalog.contains("sqlcipher = \"4.18.0\""))
+        assertTrue(catalog.contains("sqlcipher = \"4.17.0\""))
         assertTrue(catalog.contains("sqlite = \"2.7.0\""))
         assertTrue(appBuild.contains("implementation(libs.sqlcipher.android)"))
         assertTrue(appBuild.contains("implementation(libs.androidx.sqlite)"))
@@ -138,7 +139,7 @@ Set/add:
 ```toml
 room = "2.8.4"
 sqlite = "2.7.0"
-sqlcipher = "4.18.0"
+sqlcipher = "4.17.0"
 
 androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "sqlite" }
 sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }

@@ -14,7 +14,7 @@ Each phase must finish with a compiling application and fresh tests. A later pha
 
 1. **Platform foundation**
    - Release 3.0 build baseline.
-   - Room 2.8.4 + SQLCipher 4.18.0 integration.
+   - Room 2.8.4 + SQLCipher 4.17.0 integration (latest approved pin compatible with compile SDK 36).
    - Business clock, UUID source, stable Device ID primitives.
    - Keystore-wrapped database passphrase and encrypted database probe.
    - Plan: `2026-08-25-android-set-3.0-phase-1-foundation.md`.

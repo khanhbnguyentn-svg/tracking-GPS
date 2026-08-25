@@ -42,7 +42,7 @@ Technology baseline:
 - Kotlin, coroutines, StateFlow;
 - Jetpack Compose + Material 3 + Navigation Compose;
 - ViewModel and lifecycle-aware state collection;
-- Room + SQLCipher + WAL;
+- Room 2.8.4 + SQLCipher 4.17.0 + WAL; SQLCipher 4.17.0 is the approved compile SDK 36-compatible pin for release 3.0;
 - Android Keystore;
 - FusedLocationProviderClient;
 - location foreground service;
