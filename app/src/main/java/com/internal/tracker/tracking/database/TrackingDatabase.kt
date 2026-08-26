@@ -4,8 +4,15 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [TrackingDatabaseMetadataEntity::class],
-    version = 1,
+    entities = [
+        TrackingDatabaseMetadataEntity::class,
+        BootSessionEntity::class,
+        SequenceStateEntity::class,
+        RawGpsSampleEntity::class,
+    ],
+    version = 2,
     exportSchema = true,
 )
-abstract class TrackingDatabase : RoomDatabase()
+abstract class TrackingDatabase : RoomDatabase() {
+    abstract fun trackingDao(): TrackingDao
+}

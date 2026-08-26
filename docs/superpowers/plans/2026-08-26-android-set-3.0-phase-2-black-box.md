@@ -92,11 +92,11 @@ data class PersistedRawSample(val sequenceNumber: Long, val sample: RawLocationS
 interface RawLocationRepository {
     suspend fun startBootSession(reason: BootReason, nowUtcMillis: Long, nowElapsedNanos: Long): String
     suspend fun persistOrdinary(sample: RawLocationSample, bootSessionId: String): PersistedRawSample?
-    suspend fun persistBoundary(sample: RawLocationSample, bootSessionId: String): PersistedRawSample
+    suspend fun persistBoundary(sample: RawLocationSample, bootSessionId: String, kind: RawSampleKind): PersistedRawSample
 }
 ```
 
-- [ ] **Step 1: Write failing tests.**
+- [x] **Step 1: Write failing tests.**
 
 ```kotlin
 @Test fun acceptsOnlyOneOrdinarySamplePerTenSecondWindow() {
@@ -110,11 +110,11 @@ interface RawLocationRepository {
 }
 ```
 
-- [ ] **Step 2: Run the JVM and instrumented raw tests.** Expected: FAIL because model, DAO, and repository are absent.
-- [ ] **Step 3: Implement entities for boot session, singleton sequence state, `gps_raw_sample`, Device ID/configuration.** Raw stores UTC, captured offset, elapsed realtime, coordinates, every nullable source altitude/accuracy/speed/bearing field, provider, mock flag, boot session, kind, and unique sequence. Index capture time and `(bootSessionId, elapsedRealtimeNanos)`.
-- [ ] **Step 4: Implement gate.** Ordinary samples require elapsed advance `>= 10_000_000_000L`; non-increasing elapsed is rejected; boundary kinds bypass the gate. Never inspect accuracy, coordinate, speed, or epoch clock.
-- [ ] **Step 5: Implement repository as a `Mutex` plus `RoomDatabase.withTransaction`: query last ordinary elapsed, gate, increment sequence state, insert exact row, return persisted sample.** A failed insert must roll back sequence allocation.
-- [ ] **Step 6: Add exact-value/reopen and insert-rollback tests, then rerun focused tests.** Expected: PASS.
+- [x] **Step 2: Run the JVM and instrumented raw tests.** Expected: FAIL because model, DAO, and repository are absent.
+- [x] **Step 3: Implement core entities for boot session, singleton sequence state, and `gps_raw_sample`.** Raw stores UTC, captured offset, elapsed realtime, coordinates, every nullable source altitude/accuracy/speed/bearing field, provider, mock flag, boot session, kind, and unique sequence. Index capture time and `(bootSessionId, elapsedRealtimeNanos)`. Device identity remains the Phase 1 encrypted stable source identifier; backend package configuration persistence is added with the package-ingestion task.
+- [x] **Step 4: Implement gate.** Ordinary samples require elapsed advance `>= 10_000_000_000L`; non-increasing elapsed is rejected; boundary kinds bypass the gate. Never inspect accuracy, coordinate, speed, or epoch clock.
+- [x] **Step 5: Implement repository as a `Mutex` plus `RoomDatabase.withTransaction`: query last ordinary elapsed, gate, increment sequence state, insert exact row, return persisted sample.** A failed insert must roll back sequence allocation.
+- [x] **Step 6: Add exact-value, boundary-kind, gate-rejection, and insert-rollback tests, then rerun focused tests.** Expected: PASS. Reopen coverage remains in the database bootstrap instrumentation test and will be extended with raw rows during migration/update acceptance.
 - [ ] **Step 7: Commit exact files with message `feat: persist encrypted raw GPS samples`.**
 
 ## Task 3: Implement movement, gap health, and incident persistence
