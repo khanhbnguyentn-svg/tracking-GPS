@@ -1,0 +1,133 @@
+# Huong dan trien khai GPS Email Pilot
+
+## 1. Phạm vi
+
+- Android 10 tro len, phan phoi APK noi bo.
+- 100 thiet bi, danh so `001` den `100`; Device ID tu dong khong thay doi.
+- Lich `6h`, `12h`, `24h`, neo gan 00:00 va dan deu trong 59 phut.
+- Khong can Traccar, webserver, Cloudflare Tunnel hoac may tinh chay lien tuc.
+
+Ứng dụng tách thành hai luồng độc lập:
+
+- `TrackingService` chạy foreground khi tracking bật, quan sát GPS khoảng mỗi 10 giây và lưu sự kiện hành trình vào Room.
+- `ReportWorker` chạy theo lịch 6h/12h/24h, gom các record đã hoàn tất nhưng chưa gửi vào một CSV và gửi một email duy nhất.
+
+Khi xe đang chạy, app lưu `PERIODIC` mỗi 2 phút, đồng thời lưu `START`, `TEMP_STOP` và `STOP`. Điểm bắt đầu dừng được tạo ngay dưới dạng `TEMP_STOP` chưa hoàn tất; nếu xe chạy lại trước 2 phút, record được hoàn tất dưới dạng `TEMP_STOP`; nếu đứng yên đủ 2 phút, cùng record đó được nâng cấp thành `STOP`.
+
+## 2. Chuan bi Gmail
+
+1. Tao Gmail rieng chi de gui bao cao.
+2. Bat xac minh hai buoc tren tai khoan Gmail.
+3. Tao App Password 16 ky tu.
+4. Gmail mien phi co gioi han 500 thu/24 gio. Lich 6h voi 100 may tao toi da 400 thu theo lich, chua tinh retry.
+
+Khong dung mat khau dang nhap Gmail thuong. Dien thoai khong phai xac minh hai buoc khi gui SMTP bang App Password.
+
+## 3. Chuan bi may Windows moi
+
+1. Cai Git, JDK 17 va Android Studio hoac Android command-line tools mien phi.
+2. Cai Android SDK Platform 36 va Build Tools 36.0.0.
+3. Clone repository va mo PowerShell tai thu muc du an.
+4. Không cần Gmail credential để build. `gmail-secrets.properties` chỉ là tùy chọn nếu muốn điền sẵn mặc định nội bộ:
+
+```properties
+SMTP_USER=sender@gmail.com
+SMTP_APP_PASSWORD=abcdefghijklmnop
+```
+
+File này bị `.gitignore`; không đưa credential lên GitHub. Khi không tạo file, quản trị viên nhập Gmail gửi và App Password trên từng điện thoại.
+
+5. Chuẩn bị signing một lần trên máy phát hành:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-release-signing.ps1
+```
+
+6. Build APK release đã ký và xác minh:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
+```
+
+7. Lấy APK tại `dist/tracking-gps-2.1.0.apk`. GitHub Actions chỉ chạy kiểm thử/debug compile và không cung cấp APK cập nhật chính thức. Xem quy trình backup/cập nhật tại `docs/stable-apk-update-runbook.md`.
+
+## 4. Cap phat dien thoai
+
+Khi nâng từ bản cũ, mở APK release và chọn **Cập nhật**; không gỡ app. Sau update, mở app một lần và xác nhận History, cấu hình, PIN, tracking state và lịch báo cáo còn nguyên.
+
+1. Cài APK và mở app; màn `Trạng thái` xuất hiện ngay, không yêu cầu PIN.
+2. Mở `Cấu hình`, nhập PIN quản trị, sau đó nhập số thiết bị duy nhất, email nhận, chu kỳ, Gmail gửi và App Password 16 ký tự.
+3. Bấm `Lưu và kiểm tra`; chỉ cấu hình được Gmail chấp nhận mới được lưu. Khi đổi các trường khác về sau, có thể để trống ô App Password để giữ giá trị đã lưu.
+4. Cấp vị trí chính xác, `Luôn cho phép` vị trí nền và thông báo khi được hỏi.
+5. Có thể cấp thêm quyền Nhận diện hoạt động để hỗ trợ nhận biết `IN_VEHICLE`. Nếu từ chối hoặc thiết bị không hỗ trợ, app vẫn theo dõi bằng tốc độ và khoảng cách GPS.
+6. Nếu nút `Cấp quyền thiết bị` mở Settings, chọn quyền còn thiếu rồi quay lại app.
+7. Bấm `Bắt đầu theo dõi` và xác nhận thông báo foreground `Đang theo dõi vị trí` xuất hiện.
+
+Khong tat pin/toi uu nen cho app neu nha san xuat dien thoai co tuy chon rieng. WorkManager phuc hoi sau reboot, nhung Android/firmware co the tri hoan hoac dung tac vu; app hien thoi diem GPS/email cuoi va loi ky thuat gan nhat.
+
+## 5. Dữ liệu và mất sóng
+
+Foreground service ghi Room liên tục, không gửi email ngay. Khi đến kỳ, worker xóa record cũ hơn một năm, lấy các record đã hoàn tất chưa gửi, tạo một CSV và gửi một email. Khi mất mạng, record giữ `RETRYING`; kỳ sau tiếp tục gom backlog. Bản ghi `SENT` vẫn được giữ trong lịch sử cho tới khi bị xóa thủ công hoặc quá thời hạn lưu giữ.
+
+CSV gồm Device ID/số thiết bị, thời gian, tọa độ, sai số GPS, pin, thời gian theo dõi, trạng thái gửi và `record_type`. Record `TEMP_STOP` chưa hoàn tất không được đưa vào email.
+
+Tại màn `Lịch sử`:
+
+- Chọn `Năm` và `Tháng` để xem hoặc xuất đúng phạm vi.
+- Chọn tháng khi năm đang là `Tất cả` sẽ tự chọn năm hiện tại.
+- `Xóa theo bộ lọc` chỉ bật khi đã chọn năm; nó xóa đúng năm hoặc tháng đang chọn.
+- `Xóa tất cả` xóa toàn bộ database.
+- Mỗi thao tác xóa đều yêu cầu xác nhận phạm vi, sau đó nhập PIN.
+
+Màn Status không hiển thị Device ID. Device ID vẫn có trong Cấu hình, Room và CSV.
+
+## 6. Bảo vệ bằng PIN
+
+- App mở trực tiếp tại Status, không yêu cầu PIN khi khởi động.
+- Status và Lịch sử chỉ đọc, có thể truy cập mà không cần PIN.
+- Cấu hình yêu cầu PIN ở lần truy cập đầu tiên trong mỗi phiên.
+- Dừng tracking luôn yêu cầu PIN riêng.
+- Xóa theo bộ lọc và xóa tất cả luôn yêu cầu xác nhận rồi nhập PIN riêng.
+
+## 7. Đổi credential
+
+1. Tao App Password moi trong Gmail.
+2. Mở app, vào `Cấu hình` và nhập PIN quản trị.
+3. Dan ma 16 ky tu vao o App Password va bam `Luu va kiem tra`.
+4. App chi thay credential cu sau khi Gmail chap nhan dang nhap.
+
+## 8. Kiểm thử còn phải làm trên thiết bị
+
+- Android 10, 12, 14+.
+- Reboot va doi mui gio.
+- Xác nhận callback GPS khoảng 10 giây và thay đổi BALANCED/HIGH accuracy theo trạng thái.
+- Chạy xe để kiểm tra `START`, `PERIODIC` sau 2 phút, `TEMP_STOP` dưới 2 phút và `STOP` từ 2 phút.
+- Từ chối quyền Nhận diện hoạt động và xác nhận fallback GPS vẫn ghi dữ liệu.
+- Dừng tracking, mở Cấu hình và xóa dữ liệu để xác nhận đúng các dialog PIN.
+- Lọc/xóa qua biên tháng 12 sang tháng 1 theo múi giờ thiết bị.
+- Giữ dữ liệu cũ hơn một năm trong bản test rồi chạy báo cáo để xác nhận retention.
+- GPS tat/quyen bi thu hoi.
+- Doze va toi uu pin cua nha san xuat.
+- Mat mang, tao backlog, sau do co mang lai.
+- App Password sai/bi thu hoi va cap nhat ma moi.
+- Lich 6h/12h/24h; thiet bi `001` va `100`.
+- Mo/chia se CSV va doi chieu email nhan.
+
+JVM unit test va lint khong thay the cac buoc thiet bi nay.
+
+## 9. Tracking integrity diagnostics
+
+Từ bản 2.1.0, app kiểm tra callback GPS mỗi 10 giây. Khi không có callback trong 30 giây, app tạo đúng một incident `GPS_GAP`, thử đăng ký lại location và gửi ngay email `GPS_GAP_OPENED`. Khi callback trở lại, app đóng cùng incident ID và gửi `GPS_GAP_RECOVERED`. Nếu mất mạng hoặc SMTP thất bại, app không gửi lặp liên tục; incident còn chờ và được đưa vào report định kỳ sau.
+
+Report định kỳ có thể gồm ba attachment: route CSV, diagnostic summary CSV và diagnostic samples CSV. Report vẫn được gửi nếu chỉ có diagnostics mà không có route mới. Mỗi report có report ID ổn định để admin đối chiếu các email trùng hoặc thiếu kỳ.
+
+Diagnostics chỉ quan sát và báo cáo. Nó không loại bỏ điểm GPS sai số lớn, không sửa tọa độ, không thay đổi quyết định `START`/`PERIODIC`/`TEMP_STOP`/`STOP`, và không xuất hiện trong UI dành cho user.
+
+Vận hành retention:
+
+- Route record và incident summary cũ hơn một năm được tự xóa khi chạy report.
+- Diagnostic samples đã report được giữ tối đa 30 ngày; incident chưa report được giữ tối đa một năm.
+- Không ghi Gmail App Password, PIN, stack trace hoặc tọa độ đầy đủ vào biên bản kiểm thử.
+- Khi điều tra mất dữ liệu, đối chiếu report ID, incident ID, thời điểm OPENED/RECOVERED, trạng thái foreground service và attachment; backend/admin xử lý logic độ chính xác GPS.
+
+Quy trình kiểm thử signed build đầy đủ nằm trong `docs/android-14-device-test-checklist.md`, gồm Location off/on 40 giây, mất mạng rồi fallback định kỳ, reboot, update in-place, cadence 2 phút và `TEMP_STOP`/`STOP` bình thường.

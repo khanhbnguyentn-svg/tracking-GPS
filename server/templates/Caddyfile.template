@@ -1,9 +1,0 @@
-https://@@SERVER_NAME@@:@@PUBLIC_GPS_PORT@@ {
-    tls internal
-    reverse_proxy 127.0.0.1:@@TRACCAR_GPS_PORT@@
-}
-
-https://@@SERVER_NAME@@:@@PUBLIC_WEB_PORT@@ {
-    tls internal
-    reverse_proxy 127.0.0.1:@@TRACCAR_WEB_PORT@@
-}

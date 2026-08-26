@@ -1,1 +1,3 @@
-# Room and OkHttp ship consumer rules; no app-specific rules are required.
+# JavaMail discovers these implementations by class name in META-INF resources.
+-keep class com.sun.mail.smtp.** { *; }
+-keep class com.sun.mail.handlers.** { *; }
