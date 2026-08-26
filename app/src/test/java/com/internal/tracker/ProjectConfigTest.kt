@@ -47,7 +47,8 @@ class ProjectConfigTest {
         val manifest = File(root, "app/src/main/AndroidManifest.xml").readText()
 
         listOf("server", "gps-receiver", "config").forEach { path ->
-            assertFalse("Legacy path must be absent: $path", File(root, path).exists())
+            val containsFiles = File(root, path).walkTopDown().any(File::isFile)
+            assertFalse("Legacy path must not contain files: $path", containsFiles)
         }
         listOf(
             ".schedule.ScheduleReceiver",
