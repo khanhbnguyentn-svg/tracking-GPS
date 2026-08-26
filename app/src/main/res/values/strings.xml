@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Theo dõi nội bộ</string>
-    <string name="setup_pending">Chưa có cấu hình kết nối</string>
-    <string name="tracking_channel">Theo dõi vị trí</string>
-    <string name="tracking_notification_title">Đang chia sẻ vị trí</string>
-    <string name="tracking_notification_text">Vị trí đang được gửi đến máy chủ nội bộ</string>
-    <string name="stop_tracking">Dừng</string>
+    <string name="app_name">Android SET 3.0</string>
+    <string name="phase_status">Phase 1 platform foundation</string>
 </resources>

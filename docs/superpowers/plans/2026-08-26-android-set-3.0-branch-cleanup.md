@@ -180,22 +180,13 @@ Set strings to `Android SET 3.0` and `Phase 1 platform foundation`.
 
 Keep the approved permissions and application security attributes, but keep only `.MainActivity` under `<application>`. Remove FileProvider, ScheduleReceiver, TrackingService, and VehicleActivityReceiver declarations.
 
-- [ ] **Step 5: Compile before deleting the now-unreferenced legacy source**
+- [ ] **Step 5: Continue directly to Task 3 before compiling**
 
-Run:
+The legacy services and UI compile against `TrackerApplication.container`. Replacing the application wiring intentionally removes that API, so the shell replacement and Task 3 legacy deletions form one atomic compile change.
 
-```powershell
-.\gradlew.bat compileDebugKotlin
-```
+- [ ] **Step 6: Commit the shell replacement together with Task 3**
 
-Expected: PASS.
-
-- [ ] **Step 6: Commit the shell replacement**
-
-```powershell
-git add app/src/main app/src/main/res
-git commit -m "refactor: replace email pilot with SET shell"
-```
+Do not create a known-broken intermediate commit. Use the Task 3 commit after the legacy references and dependencies have been removed.
 
 ---
 
@@ -239,7 +230,7 @@ app/src/androidTest/java/com/internal/tracker/core/**
 
 - [ ] **Step 2: Remove email-pilot configuration from Gradle**
 
-Remove `gmailSecrets`, `secret`, `quoted`, `SMTP_USER`, `SMTP_APP_PASSWORD`, `buildConfig = true`, WorkManager, Play Services Location, Android Mail, and Android Activation. Preserve release signing, Compose, Room, SQLite, SQLCipher, Security Crypto, test dependencies, and KSP.
+Remove `gmailSecrets`, `secret`, `quoted`, `SMTP_USER`, `SMTP_APP_PASSWORD`, WorkManager, Play Services Location, Android Mail, and Android Activation. Preserve `buildConfig = true` because `ProjectConfigTest` reads `BuildConfig.APPLICATION_ID`; also preserve release signing, Compose, Room, SQLite, SQLCipher, Security Crypto, required test dependencies, and KSP.
 
 Remove now-unused version-catalog aliases only after `rg` confirms zero references.
 
@@ -255,7 +246,7 @@ Expected: all retained Phase 1 core and permission-state tests PASS. The branch-
 
 ```powershell
 git add app gradle/libs.versions.toml
-git commit -m "refactor: remove Android 2.1 email pilot"
+git commit -m "refactor: replace email pilot with SET shell"
 ```
 
 ---
