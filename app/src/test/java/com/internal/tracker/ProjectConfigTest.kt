@@ -2,17 +2,20 @@ package com.internal.tracker
 
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProjectConfigTest {
-    private fun projectFile(relativePath: String): String {
-        val start = File(System.getProperty("user.dir"))
-        val root = generateSequence(start) { it.parentFile }
+    private fun repositoryRoot(): File {
+        val start = File(System.getProperty("user.dir") ?: error("user.dir is unavailable"))
+        return generateSequence(start) { it.parentFile }
             .firstOrNull { File(it, "settings.gradle.kts").isFile }
             ?: error("Repository root not found from ${start.absolutePath}")
-        return File(root, relativePath).readText()
     }
+
+    private fun projectFile(relativePath: String): String =
+        File(repositoryRoot(), relativePath).readText()
 
     @Test
     fun `package name stays stable`() {
@@ -36,5 +39,26 @@ class ProjectConfigTest {
         assertTrue(appBuild.contains("implementation(libs.androidx.sqlite)"))
         assertTrue(manifest.contains("android:allowBackup=\"false\""))
         assertTrue(manifest.contains("android:usesCleartextTraffic=\"false\""))
+    }
+
+    @Test
+    fun `android SET branch excludes legacy subsystems and declarations`() {
+        val root = repositoryRoot()
+        val manifest = File(root, "app/src/main/AndroidManifest.xml").readText()
+
+        listOf("server", "gps-receiver", "config").forEach { path ->
+            assertFalse("Legacy path must be absent: $path", File(root, path).exists())
+        }
+        listOf(
+            ".schedule.ScheduleReceiver",
+            ".tracking.TrackingService",
+            ".tracking.VehicleActivityReceiver",
+            "androidx.core.content.FileProvider",
+        ).forEach { declaration ->
+            assertFalse(
+                "Legacy manifest declaration must be absent: $declaration",
+                manifest.contains(declaration),
+            )
+        }
     }
 }
