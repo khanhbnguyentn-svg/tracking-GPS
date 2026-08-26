@@ -115,7 +115,7 @@ interface RawLocationRepository {
 - [x] **Step 4: Implement gate.** Ordinary samples require elapsed advance `>= 10_000_000_000L`; non-increasing elapsed is rejected; boundary kinds bypass the gate. Never inspect accuracy, coordinate, speed, or epoch clock.
 - [x] **Step 5: Implement repository as a `Mutex` plus `RoomDatabase.withTransaction`: query last ordinary elapsed, gate, increment sequence state, insert exact row, return persisted sample.** A failed insert must roll back sequence allocation.
 - [x] **Step 6: Add exact-value, boundary-kind, gate-rejection, and insert-rollback tests, then rerun focused tests.** Expected: PASS. Reopen coverage remains in the database bootstrap instrumentation test and will be extended with raw rows during migration/update acceptance.
-- [ ] **Step 7: Commit exact files with message `feat: persist encrypted raw GPS samples`.**
+- [x] **Step 7: Commit exact files with message `feat: persist encrypted raw GPS samples`.**
 
 ## Task 3: Implement movement, gap health, and incident persistence
 
