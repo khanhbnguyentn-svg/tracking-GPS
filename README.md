@@ -1,43 +1,50 @@
-# GPS Email Pilot
+# Android SET 3.0
 
-Ứng dụng nội bộ cho Android 10+, theo dõi GPS bằng foreground service và gửi báo cáo tổng hợp qua Gmail SMTP.
+This branch is the focused Android SET 3.0 workspace. It does not contain the production server, GPS receiver, or Android 2.1 periodic-email pilot.
 
-- Quan sát vị trí khoảng mỗi 10 giây khi tracking bật.
-- Lưu `START`, `PERIODIC` mỗi 2 phút khi xe chạy, `TEMP_STOP` khi bắt đầu dừng và nâng cấp thành `STOP` nếu đứng yên ít nhất 2 phút.
-- Gửi một CSV tổng hợp các record đã hoàn tất nhưng chưa gửi theo chu kỳ 6h/12h/24h.
-- Tự động xóa record cũ hơn một năm khi chạy báo cáo.
-- Activity Recognition là tín hiệu hỗ trợ tùy chọn; nếu không cấp quyền, app tiếp tục dùng GPS.
+## Document authority
 
-## Build tren Windows
+1. `SYSTEM_REQUIREMENT_SPECIFICATION.md`
+2. `ANDROID_TECHNICAL_BUILD_SPEC`
+3. `docs/superpowers/specs/2026-08-25-android-set-3.0-design.md`
+4. `docs/superpowers/plans/2026-08-25-android-set-3.0-roadmap.md`
 
-Yeu cau: JDK 17, Android SDK Platform 36 va Build Tools 36.0.0.
+The SRS defines approved business behavior. Android Technical pins implementation detail. The design records approved rationale, and the roadmap records delivery order and current completion.
 
-1. Gmail và App Password được nhập trên từng điện thoại trong `Cấu hình`; không cần credential để build APK. `gmail-secrets.properties` chỉ là tùy chọn nếu muốn điền sẵn giá trị mặc định nội bộ và không được commit.
-2. Chạy setup signing một lần nếu máy chưa có `.signing`:
+## Current status
+
+Phase 1 platform foundation is implemented. The app currently launches a minimal Compose shell; later business functionality remains governed by the roadmap.
+
+Implemented foundation includes:
+
+- Android 3.0 release identity and API baseline;
+- business time and UUID sources;
+- stable hashed Device ID with encrypted cache;
+- Android Keystore-wrapped database passphrase;
+- Room and SQLCipher integration probe;
+- platform dependency holder and launchable shell.
+
+## Build on Windows
+
+Requirements: JDK 17, Android SDK Platform 36, and Build Tools 36.0.0.
+
+```powershell
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat lintDebug
+.\gradlew.bat assembleDebug
+```
+
+Release signing remains managed by the checked-in scripts. Signing properties and keystores are local-only and must never be committed.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-release-signing.ps1
-```
-
-3. Build và xác minh APK release:
-
-```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
 ```
 
-APK phân phối: `dist/tracking-gps-2.1.0.apk`. Debug APK chỉ dùng trong phát triển và không được dùng để cập nhật điện thoại. Quy trình signing, backup và cài update: `docs/stable-apk-update-runbook.md`.
+## Branch boundaries
 
-## Su dung
+- `main`: historical source/archive, including server and GPS receiver.
+- `feature/android-set-3.0-design`: Android SET 3.0 only.
+- `feature/periodic-email-reports`: Android 2.1 periodic-email pilot only.
 
-1. Mở app; màn `Trạng thái` hiển thị ngay và `Lịch sử` có thể xem mà không cần PIN.
-2. Nhập PIN khi mở `Cấu hình` lần đầu trong phiên app; sau khi xác thực đúng, việc mở khóa có hiệu lực tới khi tiến trình app kết thúc.
-3. Nhập số thiết bị `001`-`100`, email nhận, chu kỳ và Gmail gửi.
-4. App Password để trống nếu giữ giá trị đã lưu; nhập mã mới để thay đổi.
-5. Bấm `Lưu và kiểm tra`, cấp quyền vị trí nền và thông báo, sau đó `Bắt đầu theo dõi`.
-6. Quyền nhận diện hoạt động là tùy chọn và không chặn việc bắt đầu tracking.
-7. Khi tracking chạy, Android hiển thị thông báo foreground liên tục.
-8. Xem, lọc theo Năm/Tháng và chia sẻ CSV tại `Lịch sử`.
-
-PIN luôn được yêu cầu lại khi dừng tracking hoặc xóa dữ liệu. Xóa theo bộ lọc chỉ xóa đúng năm/tháng đang chọn; `Xóa tất cả` xóa toàn bộ lịch sử sau bước xác nhận.
-
-Gio gui la khoang du kien do Android Doze co the tri hoan WorkManager. Chi tiet van hanh: `docs/periodic-gmail-pilot-handover.md`.
+Do not copy complete legacy modules between branches. Reuse must be isolated, reviewed against the current specifications, and covered by tests.

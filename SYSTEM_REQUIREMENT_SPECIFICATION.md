@@ -46,6 +46,12 @@ The system manages use of company and rented vehicles. An Android SET records co
 - Offline maps and Google Maps on SET.
 - Migration from Android app 2.1.0; clean install is permitted for 3.0.0.
 
+## 1.3 Repository boundary and implementation status
+
+The `feature/android-set-3.0-design` branch is the focused Android SET 3.0 workspace. It contains the Android application and email contract fixtures only; production backend, portal, AI, Vendor reconciliation, and GPS receiver implementations are developed outside this branch. The unchanged `main` branch retains historical server and receiver source for reference and recovery.
+
+This SRS specifies the approved target system. It does not imply that every requirement is already implemented. Current delivery status is recorded in the Android SET roadmap and active phase plan. Android 2.1 periodic-email pilot source is not authoritative for SET 3.0 and is deliberately absent from this branch.
+
 # 2. Actors and authority
 
 | Actor | Authority |

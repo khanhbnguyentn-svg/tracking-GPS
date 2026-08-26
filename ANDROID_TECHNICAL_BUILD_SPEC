@@ -23,6 +23,10 @@ This specification supplements, but does not replace, SRS 1.2. SRS defines busin
 
 Implementation shall proceed feature by feature with tests first. No implementation agent may reinterpret a numeric threshold or security/business rule already fixed here. Backend-only features remain out of scope for Android 3.0.
 
+The cleaned `feature/android-set-3.0-design` branch currently implements the Phase 1 encrypted platform foundation and a minimal launchable Compose shell. The target packages and behaviors in later sections remain scheduled work unless the roadmap records their completion. Android 2.1 periodic-email classes are deliberately excluded; later phases shall implement this specification directly and may reuse only isolated, verified techniques rather than copying the pilot architecture wholesale.
+
+Production server, portal, AI, Vendor reconciliation, and GPS receiver implementations are outside this branch. The unchanged `main` branch remains the historical source/archive for server and receiver code.
+
 ## 1. Release and platform
 
 ```text
