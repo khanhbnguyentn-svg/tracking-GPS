@@ -242,7 +242,7 @@ git ls-files app/src/test/java/com/internal/tracker
 git ls-files app/src/androidTest/java/com/internal/tracker
 ```
 
-Expected: config, data, diagnostics, export, history, mail, network, profile, queue, report, schedule, tracking, UI, worker, and migration coverage remain as present at the starting periodic commit.
+Expected: config, data, diagnostics, export, history, mail, report, schedule, tracking, UI, and migration coverage remain exactly as present at starting commit `b795501`. Do not infer additional packages from a diff against another branch.
 
 - [ ] **Step 2: Run complete verification**
 
