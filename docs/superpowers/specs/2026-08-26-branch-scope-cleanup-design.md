@@ -1,8 +1,8 @@
 # Branch Scope Cleanup Design
 
-**Date:** 2026-08-26  
-**Status:** Approved  
-**Branches:** `feature/android-set-3.0-design`, `feature/periodic-email-reports`  
+**Date:** 2026-08-26
+**Status:** Approved
+**Branches:** `feature/android-set-3.0-design`, `feature/periodic-email-reports`
 **Archive/source branch:** `main`
 
 ## 1. Goal
