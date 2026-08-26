@@ -1,53 +1,58 @@
-# Internal Traccar Tracker
+# Android 2.1 Periodic Email Pilot
 
-Ứng dụng Android 14+ lấy vị trí trong foreground service và gửi đến Traccar/OsmAnd. Kết nối được chỉnh ngay trên điện thoại hoặc nhập bằng một file JSON dùng chung. Device ID tự sinh; PIC xác nhận trên Traccar.
+This branch contains only the Android periodic-email tracking pilot. It does not contain the server, GPS receiver, or Android SET 3.0 design.
 
-## Build trên GitHub
+## Release scope
 
-1. Tạo repository trống trên GitHub, không thêm README/license.
-2. Mở Terminal tại thư mục dự án và chạy:
+- Application ID: `com.internal.tracker`
+- Version: `2.1.0` (`versionCode 6`)
+- Android baseline: API 29-36
+- GPS tracking: foreground service with local Room history
+- Delivery: periodic CSV reports through Gmail SMTP
+- Recovery: boot/update reconciliation, tracking integrity diagnostics, and durable scheduled work
+
+This branch is maintained independently from `feature/android-set-3.0-design`. Its source and documents describe the 2.1 pilot only and are not authoritative for SET 3.0.
+
+## Operational documents
+
+- `docs/email-branch-technical-reference.md`: current technical reference and source map.
+- `docs/periodic-gmail-pilot-handover.md`: build, configuration, and operating handover.
+- `docs/android-14-device-test-checklist.md`: physical-device acceptance checklist.
+- `docs/stable-apk-update-runbook.md`: stable signing and APK update procedure.
+- `docs/gmail-build-secrets.example.properties`: local Gmail build defaults template.
+
+Feature rationale and implementation history are limited to the periodic-email documents under `docs/superpowers/specs/` and `docs/superpowers/plans/`.
+
+## Build on Windows
+
+Requirements: JDK 17, Android SDK Platform 36, and Build Tools 36.0.0.
 
 ```powershell
-git remote add origin https://github.com/TEN_CUA_BAN/TEN_REPO.git
-git push -u origin main
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat lintDebug
+.\gradlew.bat assembleDebug
 ```
 
-3. Mở tab **Actions** trên GitHub, chọn workflow **Android** và chờ dấu xanh.
-4. Mở lần chạy mới nhất, tải artifact `traccar-tracker-debug`, giải nén và cài `app-debug.apk` lên máy test.
-
-GitHub Actions tự chạy unit test, Android lint và build APK nội bộ. Dự án không có quy trình phát hành Google Play hoặc phân phối công khai.
-
-## Build bằng Android Studio
-
-- Android Studio mới, JDK 17 và Android SDK 36.
-- Mở thư mục dự án, chờ Gradle sync, chọn **Build > Build APK(s)**.
-- APK nằm tại `app/build/outputs/apk/debug/app-debug.apk`.
-
-Hoặc chạy:
+Gmail credentials are configured on each device. For optional internal build defaults, copy the example file and keep the result local:
 
 ```powershell
-./gradlew.bat testDebugUnitTest lintDebug assembleDebug
+Copy-Item .\docs\gmail-build-secrets.example.properties .\gmail-secrets.properties
 ```
 
-## Cấu hình điện thoại
+Never commit `gmail-secrets.properties`, Gmail App Passwords, signing properties, or keystores.
 
-1. IT sửa `config/traccar-profile.example.json` thành host/port/TLS thực tế và gửi cùng một file cho mọi máy.
-2. Trong app mở **Kết nối**, chọn **Nhập JSON**, xem trước rồi xác nhận.
-3. Chọn cấu hình vừa nhập làm cấu hình hoạt động.
-4. Cấp lần lượt quyền vị trí chính xác, vị trí nền và thông báo. Khi Android chặn quyền, nút trong app mở đúng trang Settings.
-5. Nhấn **Bắt đầu theo dõi**, giữ notification foreground đang chạy.
-6. Gửi Device ID hiển thị trong app cho PIC; PIC tìm thiết bị tự đăng ký trong group chờ, đổi tên và xác nhận.
-7. Mở **Chẩn đoán**: thử server trước, sau đó thử gửi vị trí GPS thật.
+## Stable release
 
-Không tắt tối ưu pin nếu chính sách công ty không cho phép. Nếu hãng điện thoại dừng app, trạng thái/notification sẽ cho biết tracking không còn chạy; WorkManager chỉ gửi lại dữ liệu đã xếp hàng.
+Prepare signing once on a build machine:
 
-Tài liệu IT: `Huong-dan-ky-thuat-setup-Traccar-Server-noi-bo.md`  
-Checklist máy thật: `docs/android-14-device-test-checklist.md`
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-release-signing.ps1
+```
 
-## Web nhận GPS nội bộ
+Build and verify the signed APK:
 
-Thư mục `gps-receiver/` chứa web Node.js nhận trực tiếp contract OsmAnd hiện tại và JSON POST trên cổng `5055`. Sau khi cài Windows Service, mở dashboard tại `http://localhost:5055/dashboard`; điện thoại trong cùng Wi-Fi dùng profile mẫu trong `config/traccar-profile.example.json`.
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-release-apk.ps1
+```
 
-Web này là môi trường LAN độc lập, không phải Traccar và không được mở port-forward ra Internet. Receiver dùng PostgreSQL/PostGIS, có đăng nhập Admin/Dispatcher và tự chạy migration trước khi mở cổng. Xem `gps-receiver/README.md` để cài đặt, kiểm thử và vận hành.
-
-Trên Windows, bộ cài mặc định đặt toàn bộ server và dữ liệu dưới `D:\InternalGPS` bằng các thành phần miễn phí/mã nguồn mở. Chạy hai installer với `-WhatIf` trước, sau đó mới chạy thật trong Windows PowerShell Administrator.
+The distributable is `dist/tracking-gps-2.1.0.apk`. Use the stable update runbook before installing it on managed phones.

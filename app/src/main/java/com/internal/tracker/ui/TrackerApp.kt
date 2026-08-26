@@ -2,33 +2,35 @@ package com.internal.tracker.ui
 
 import android.Manifest
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.Uri
-import android.os.PowerManager
+import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -37,9 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,303 +49,509 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.internal.tracker.AppContainer
 import com.internal.tracker.TrackerApplication
-import com.internal.tracker.config.ImportedProfile
-import com.internal.tracker.config.Scheme
-import com.internal.tracker.config.TlsMode
-import com.internal.tracker.network.DiagnosticResult
-import com.internal.tracker.network.TlsClientFactory
-import com.internal.tracker.profile.Profile
+import com.internal.tracker.config.PilotConfig
+import com.internal.tracker.mail.MailResult
 import com.internal.tracker.tracking.PermissionAction
 import com.internal.tracker.tracking.PermissionPolicy
 import com.internal.tracker.tracking.PermissionSnapshot
 import java.text.DateFormat
+import java.time.Instant
+import java.time.Year
+import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class Destination { STATUS, PROFILES, DIAGNOSTICS }
+private data class PinRequest(
+    val action: ProtectedAction,
+    val onVerified: () -> Unit,
+)
+
+private data class DeleteRequest(
+    val action: ProtectedAction,
+    val label: String,
+    val range: HistoryTimeRange? = null,
+)
 
 @Composable
 fun TrackerApp() {
     val container = (LocalContext.current.applicationContext as TrackerApplication).container
-    var destination by rememberSaveable { mutableStateOf(Destination.STATUS) }
+    var settingsUnlocked by rememberSaveable { mutableStateOf(false) }
+    var destination by rememberSaveable { mutableStateOf(AppUiPolicy.initialDestination) }
+    var pinRequest by remember { mutableStateOf<PinRequest?>(null) }
+
+    fun requirePin(action: ProtectedAction, onVerified: () -> Unit) {
+        pinRequest = PinRequest(action, onVerified)
+    }
+
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
                 bottomBar = {
                     NavigationBar {
-                        NavigationBarItem(destination == Destination.STATUS, { destination = Destination.STATUS }, { androidx.compose.material3.Icon(Icons.Default.Home, "Trạng thái") }, label = { Text("Trạng thái") })
-                        NavigationBarItem(destination == Destination.PROFILES, { destination = Destination.PROFILES }, { androidx.compose.material3.Icon(Icons.Default.Settings, "Cấu hình") }, label = { Text("Cấu hình") })
-                        NavigationBarItem(destination == Destination.DIAGNOSTICS, { destination = Destination.DIAGNOSTICS }, { androidx.compose.material3.Icon(Icons.Default.Build, "Chẩn đoán") }, label = { Text("Chẩn đoán") })
+                        NavigationBarItem(
+                            destination == Destination.STATUS,
+                            { destination = Destination.STATUS },
+                            { Icon(Icons.Default.Home, "Trạng thái") },
+                            label = { Text("Trạng thái") },
+                        )
+                        NavigationBarItem(
+                            destination == Destination.SETTINGS,
+                            {
+                                if (AppUiPolicy.requiresPin(
+                                        ProtectedAction.OPEN_SETTINGS,
+                                        settingsUnlocked,
+                                    )
+                                ) {
+                                    requirePin(ProtectedAction.OPEN_SETTINGS) {
+                                        settingsUnlocked = true
+                                        destination = Destination.SETTINGS
+                                    }
+                                } else {
+                                    destination = Destination.SETTINGS
+                                }
+                            },
+                            { Icon(Icons.Default.Settings, "Cấu hình") },
+                            label = { Text("Cấu hình") },
+                        )
+                        NavigationBarItem(
+                            destination == Destination.HISTORY,
+                            { destination = Destination.HISTORY },
+                            { Icon(Icons.Default.History, "Lịch sử") },
+                            label = { Text("Lịch sử") },
+                        )
                     }
                 },
             ) { padding ->
                 when (destination) {
-                    Destination.STATUS -> StatusScreen(container, Modifier.padding(padding))
-                    Destination.PROFILES -> ProfilesScreen(container, Modifier.padding(padding))
-                    Destination.DIAGNOSTICS -> DiagnosticsScreen(container, Modifier.padding(padding))
+                    Destination.STATUS -> StatusScreen(
+                        container,
+                        Modifier.padding(padding),
+                        ::requirePin,
+                    )
+                    Destination.SETTINGS -> AdminSettingsScreen(container, Modifier.padding(padding))
+                    Destination.HISTORY -> HistoryScreen(
+                        container,
+                        Modifier.padding(padding),
+                        ::requirePin,
+                    )
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun StatusScreen(container: AppContainer, modifier: Modifier) {
-    val context = LocalContext.current
-    val activity = context as Activity
-    val profiles by container.profiles.observeAll().collectAsStateWithLifecycle(emptyList())
-    val queued by container.queue.count().collectAsStateWithLifecycle(0)
-    var refresh by remember { mutableIntStateOf(0) }
-    var fineRequested by rememberSaveable { mutableStateOf(false) }
-    val fineLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refresh++ }
-    val backgroundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
-    RefreshOnResume { refresh++ }
-    val permission = permissionSnapshot(activity, fineRequested, refresh)
-    val action = PermissionPolicy.next(permission)
-    val active = profiles.firstOrNull { it.active }
-    val tracking = container.trackingController.isTracking()
-
-    Column(modifier.padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Theo dõi nội bộ", style = MaterialTheme.typography.headlineSmall)
-        StatusRow("Trạng thái", if (tracking) "Đang theo dõi" else "Đã dừng")
-        StatusRow("Profile", active?.name ?: "Chưa chọn")
-        StatusRow("Device ID", container.deviceId.get())
-        OutlinedButton(
-            onClick = {
-                context.getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText("Device ID", container.deviceId.get()))
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Sao chép Device ID") }
-        StatusRow("Điểm chờ gửi", queued.toString())
-        StatusRow("GPS cuối", formatTime(container.trackingPreferences.lastLocationTime))
-        StatusRow("Gửi cuối", formatTime(container.trackingPreferences.lastSendTime))
-        if (tracking) {
-            Button(onClick = { container.trackingController.stop(); refresh++ }, modifier = Modifier.fillMaxWidth()) { Text("Dừng theo dõi") }
-        } else {
-            Button(
-                onClick = {
-                    when (action) {
-                        PermissionAction.OpenLocationSettings -> context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                        PermissionAction.RequestFine -> { fineRequested = true; fineLauncher.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)) }
-                        PermissionAction.RequestBackground -> backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                        PermissionAction.RequestNotifications -> notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        PermissionAction.OpenAppSettings -> openAppSettings(activity)
-                        PermissionAction.Ready -> if (active != null) container.trackingController.start()
-                    }
-                    refresh++
+        pinRequest?.let { request ->
+            PinVerificationDialog(
+                container = container,
+                action = request.action,
+                onDismiss = { pinRequest = null },
+                onVerified = {
+                    pinRequest = null
+                    request.onVerified()
                 },
-                enabled = active != null,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (active == null) "Chọn profile trước" else permissionButtonText(action)) }
+            )
         }
-        BatteryButton()
-        if (active?.scheme == Scheme.HTTP) Text("Cảnh báo: HTTP không mã hóa. Chỉ dùng trong mạng nội bộ/VPN.", color = MaterialTheme.colorScheme.error)
     }
 }
 
 @Composable
-private fun ProfilesScreen(container: AppContainer, modifier: Modifier) {
+private fun PinVerificationDialog(
+    container: AppContainer,
+    action: ProtectedAction,
+    onDismiss: () -> Unit,
+    onVerified: () -> Unit,
+) {
+    var pin by remember(action) { mutableStateOf("") }
+    var error by remember(action) { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(pinDialogTitle(action)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                PinField(pin, { pin = it; error = false }, error)
+                if (error) Text("PIN không đúng", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            Button({
+                if (container.adminPin.verify(pin)) onVerified() else error = true
+            }) { Text("Xác nhận") }
+        },
+        dismissButton = { OutlinedButton(onDismiss) { Text("Hủy") } },
+    )
+}
+
+@Composable
+private fun PinField(value: String, onValueChange: (String) -> Unit, isError: Boolean) {
+    OutlinedTextField(
+        value,
+        { onValueChange(it.filter(Char::isDigit).take(8)) },
+        label = { Text("PIN quản trị") },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        isError = isError,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun StatusScreen(
+    container: AppContainer,
+    modifier: Modifier,
+    requirePin: (ProtectedAction, () -> Unit) -> Unit,
+) {
+    val activity = LocalActivity.current ?: return
+    val scope = rememberCoroutineScope()
+    var refresh by remember { mutableIntStateOf(0) }
+    var fineRequested by remember { mutableStateOf(false) }
+    val fine = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val background = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val activityRecognition = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        container.reconcileTracking()
+        refresh++
+    }
+    val snapshot = permissionSnapshot(activity, fineRequested, refresh)
+    val action = PermissionPolicy.next(snapshot)
+    val tracking = container.trackingPreferences.enabled
+    val config = container.pilotConfig.load()
+    val configReady = config.isValid()
+    val status = StatusUiModel.create(
+        tracking = tracking,
+        deviceNumber = config.deviceNumber,
+        lastLocationTime = container.trackingPreferences.lastLocationTime,
+        lastSendTime = container.trackingPreferences.lastSendTime,
+        nextRunTime = container.trackingPreferences.nextRunTime,
+        formatTime = ::formatTime,
+    )
+    val activityPermissionMissing = ContextCompat.checkSelfPermission(
+        activity,
+        Manifest.permission.ACTIVITY_RECOGNITION,
+    ) !=
+        PackageManager.PERMISSION_GRANTED
+
+    Column(
+        modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Theo dõi GPS", style = MaterialTheme.typography.headlineSmall)
+        status.rows.forEach { StatusRow(it.label, it.value) }
+        container.trackingPreferences.lastError?.let {
+            Text("Lỗi gần nhất: $it", color = MaterialTheme.colorScheme.error)
+        }
+        if (action != PermissionAction.Ready) {
+            OutlinedButton({
+                when (action) {
+                    PermissionAction.OpenLocationSettings -> activity.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    PermissionAction.RequestFine -> {
+                        fineRequested = true
+                        fine.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    }
+                    PermissionAction.RequestBackground -> if (Build.VERSION.SDK_INT >= 30) {
+                        openAppSettings(activity)
+                    } else {
+                        background.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                    }
+                    PermissionAction.RequestNotifications -> if (Build.VERSION.SDK_INT >= 33) {
+                        notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    PermissionAction.OpenAppSettings -> openAppSettings(activity)
+                    PermissionAction.Ready -> Unit
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Cấp quyền thiết bị") }
+        }
+        if (action == PermissionAction.Ready && activityPermissionMissing) {
+            Text("Nhận diện hoạt động giúp nhận biết xe bắt đầu chạy. Nếu không cấp, app vẫn theo dõi bằng GPS.")
+            OutlinedButton(
+                { activityRecognition.launch(Manifest.permission.ACTIVITY_RECOGNITION) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Cấp quyền nhận diện hoạt động") }
+        }
+        Button({
+            if (tracking) {
+                requirePin(ProtectedAction.STOP_TRACKING) {
+                    scope.launch {
+                        container.stopTracking()
+                        refresh++
+                    }
+                }
+            } else if (action == PermissionAction.Ready && configReady) {
+                container.startTracking()
+                refresh++
+            }
+        }, enabled = tracking || (action == PermissionAction.Ready && configReady), modifier = Modifier.fillMaxWidth()) {
+            Text(if (tracking) "Dừng theo dõi" else "Bắt đầu theo dõi")
+        }
+        if (!configReady) Text("Cần hoàn tất cấu hình trước khi bắt đầu.", color = MaterialTheme.colorScheme.error)
+        Text("Android có thể trì hoãn tác vụ nền; giờ gửi là khoảng dự kiến.")
+    }
+}
+
+@Composable
+private fun AdminSettingsScreen(container: AppContainer, modifier: Modifier) {
+    val current = remember { container.pilotConfig.load() }
+    var device by remember { mutableStateOf(current.deviceNumber) }
+    var recipient by remember { mutableStateOf(current.recipient) }
+    var interval by remember { mutableIntStateOf(current.intervalHours) }
+    var sender by remember { mutableStateOf(current.sender) }
+    var password by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf<String?>(null) }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    Column(modifier.padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Cấu hình quản trị", style = MaterialTheme.typography.headlineSmall)
+        Text("Device ID: ${container.deviceId.get()}")
+        Text("Giám sát GPS: 10 giây")
+        Text("Lưu khi đang chạy: 2 phút")
+        OutlinedTextField(device, { device = it.filter(Char::isDigit).take(3) }, label = { Text("Số thiết bị 001-100") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(recipient, { recipient = it }, label = { Text("Email nhận") }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(6, 12, 24).forEach { hours ->
+                FilterChip(interval == hours, { interval = hours }, { Text("${hours}h") })
+            }
+        }
+        OutlinedTextField(sender, { sender = it }, label = { Text("Gmail gửi") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(password, { password = it }, label = { Text("App Password mới (để trống nếu giữ nguyên)") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        Button({
+            scope.launch {
+                val candidate = PilotConfig(
+                    device,
+                    recipient,
+                    interval,
+                    sender,
+                    password.ifBlank { container.pilotConfig.load().appPassword },
+                ).normalized()
+                if (!candidate.isValid()) {
+                    result = "Cấu hình không hợp lệ"
+                } else {
+                    val tested = withContext(Dispatchers.IO) { container.gmail.testCredentials(candidate) }
+                    result = if (tested == MailResult.Accepted) {
+                        container.pilotConfig.save(candidate).getOrThrow()
+                        container.reconcileSchedule()
+                        password = ""
+                        "Đã lưu và đăng nhập Gmail thành công"
+                    } else {
+                        "Không thể đăng nhập Gmail: ${tested.javaClass.simpleName}"
+                    }
+                }
+            }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Lưu và kiểm tra") }
+        result?.let { Text(it) }
+        Text("Đổi PIN", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(currentPin, { currentPin = it.filter(Char::isDigit).take(8) }, label = { Text("PIN hiện tại") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(newPin, { newPin = it.filter(Char::isDigit).take(8) }, label = { Text("PIN mới") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedButton({
+            result = container.adminPin.change(currentPin, newPin).fold(
+                { "Đã đổi PIN" },
+                { it.message ?: "Không thể đổi PIN" },
+            )
+        }, modifier = Modifier.fillMaxWidth()) { Text("Đổi PIN") }
+    }
+}
+
+@Composable
+private fun HistoryScreen(
+    container: AppContainer,
+    modifier: Modifier,
+    requirePin: (ProtectedAction, () -> Unit) -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val profiles by container.profiles.observeAll().collectAsStateWithLifecycle(emptyList())
-    var name by rememberSaveable { mutableStateOf("Production") }
-    var host by rememberSaveable { mutableStateOf("") }
-    var port by rememberSaveable { mutableStateOf("443") }
-    var interval by rememberSaveable { mutableStateOf("60") }
-    var scheme by rememberSaveable { mutableStateOf(Scheme.HTTPS) }
-    var tlsMode by rememberSaveable { mutableStateOf(TlsMode.SYSTEM) }
-    var pin by rememberSaveable { mutableStateOf("") }
-    var customCa by remember { mutableStateOf<ByteArray?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var preview by remember { mutableStateOf<ImportedProfile?>(null) }
+    val zone = remember { ZoneId.systemDefault() }
+    val currentYear = remember { Year.now(zone).value }
+    val oldestCapturedAt by container.history.observeOldestCapturedAt()
+        .collectAsStateWithLifecycle(initialValue = null)
+    var selectedYear by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedMonth by rememberSaveable { mutableStateOf<Int?>(null) }
+    var deleteRequest by remember { mutableStateOf<DeleteRequest?>(null) }
+    val filter = remember(selectedYear, selectedMonth) { HistoryFilter(selectedYear, selectedMonth) }
+    val range = remember(filter, zone) { filter.range(zone) }
+    val recordsFlow = remember(range) { container.history.observeBetween(range.from, range.until) }
+    val records by recordsFlow.collectAsStateWithLifecycle(emptyList())
+    val oldestYear = oldestCapturedAt?.let {
+        Instant.ofEpochMilli(it).atZone(zone).year
+    } ?: currentYear
+    val yearOptions = remember(oldestYear, currentYear) {
+        listOf<Int?>(null) + (oldestYear..currentYear).toList()
+    }
+    val monthOptions = remember { listOf<Int?>(null) + (1..12).toList() }
 
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        uri?.let { context.contentResolver.openOutputStream(it)?.bufferedWriter()?.use { writer -> writer.write(container.configCodec.encodeTemplate()) } }
-    }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            val text = context.contentResolver.openInputStream(it)?.bufferedReader()?.use { reader -> reader.readText() }.orEmpty()
-            container.configCodec.decode(text).onSuccess { profile -> preview = profile }.onFailure { problem -> error = problem.message }
-        }
-    }
-    val caLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        customCa = uri?.let { context.contentResolver.openInputStream(it)?.use { input -> input.readBytes() } }
-    }
-
-    Column(modifier.padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Cấu hình kết nối", style = MaterialTheme.typography.headlineSmall)
-        Text("Device ID: ${container.deviceId.get()}")
+    Column(
+        modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Lịch sử dữ liệu", style = MaterialTheme.typography.headlineSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton({ exportLauncher.launch("traccar-profile.json") }) { Text("Tải file mẫu") }
-            OutlinedButton({ importLauncher.launch(arrayOf("application/json", "text/plain")) }) { Text("Nhập file") }
+            SelectionDropdown(
+                label = "Năm",
+                selected = selectedYear,
+                options = yearOptions,
+                text = { it?.toString() ?: "Tất cả" },
+                onSelected = { year ->
+                    selectedYear = year
+                    if (year == null) selectedMonth = null
+                },
+                modifier = Modifier.weight(1f),
+            )
+            SelectionDropdown(
+                label = "Tháng",
+                selected = selectedMonth,
+                options = monthOptions,
+                text = { it?.let { month -> "%02d".format(month) } ?: "Tất cả" },
+                onSelected = { month ->
+                    val normalized = normalizeMonthSelection(month, selectedYear, currentYear)
+                    selectedYear = normalized.year
+                    selectedMonth = normalized.month
+                },
+                modifier = Modifier.weight(1f),
+            )
         }
-        OutlinedTextField(name, { name = it }, label = { Text("Tên profile") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(host, { host = it }, label = { Text("Server host/IP") }, modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(scheme == Scheme.HTTP, { scheme = Scheme.HTTP; tlsMode = TlsMode.SYSTEM }, { Text("HTTP") })
-            FilterChip(scheme == Scheme.HTTPS, { scheme = Scheme.HTTPS }, { Text("HTTPS") })
-        }
-        OutlinedTextField(port, { port = it.filter(Char::isDigit) }, label = { Text("Port") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(interval, { interval = it.filter(Char::isDigit) }, label = { Text("Chu kỳ gửi (giây)") }, modifier = Modifier.fillMaxWidth())
-        if (scheme == Scheme.HTTPS) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(tlsMode == TlsMode.SYSTEM, { tlsMode = TlsMode.SYSTEM }, { Text("System CA") })
-                FilterChip(tlsMode == TlsMode.CUSTOM_CA, { tlsMode = TlsMode.CUSTOM_CA }, { Text("Custom CA") })
-                FilterChip(tlsMode == TlsMode.PINNING, { tlsMode = TlsMode.PINNING }, { Text("Pinning") })
-            }
-            if (tlsMode == TlsMode.CUSTOM_CA) OutlinedButton({ caLauncher.launch(arrayOf("application/x-x509-ca-cert", "application/pkix-cert", "*/*")) }) { Text(if (customCa == null) "Chọn file .crt" else "Đã chọn certificate") }
-            if (tlsMode == TlsMode.PINNING) OutlinedTextField(pin, { pin = it }, label = { Text("SHA-256 pin") }, modifier = Modifier.fillMaxWidth())
-        }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button(
-            onClick = {
-                val json = buildConfigJson(name, host, port, scheme, interval, tlsMode, pin)
-                container.configCodec.decode(json).onSuccess { profile ->
-                    val caError = if (profile.tlsMode == TlsMode.CUSTOM_CA) runCatching {
-                        TlsClientFactory().customCa(requireNotNull(customCa))
-                    }.exceptionOrNull() else null
-                    if (caError != null) error = "File chứng chỉ X.509 không hợp lệ" else scope.launch {
-                        val id = container.profiles.save(profile, customCa)
-                        if (profiles.none { it.active }) container.profiles.activate(id)
-                        error = null
-                    }
-                }.onFailure { error = it.message }
+        OutlinedButton(
+            {
+                deleteRequest = DeleteRequest(
+                    ProtectedAction.DELETE_FILTERED,
+                    deleteConfirmationLabel(filter),
+                    range,
+                )
             },
+            enabled = filter.canDeleteFiltered,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Lưu profile") }
-
-        Spacer(Modifier.height(8.dp))
-        profiles.forEach { profile ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text(profile.name); Text("${profile.scheme.name.lowercase()}://${profile.host}:${profile.port}", style = MaterialTheme.typography.bodySmall) }
-                Row {
-                    TextButton({ scope.launch { container.profiles.activate(profile.id) } }, enabled = !profile.active && !container.trackingController.isTracking()) { Text(if (profile.active) "Đang dùng" else "Dùng") }
-                    TextButton({ scope.launch { container.profiles.delete(profile.id) } }, enabled = !profile.active) { Text("Xóa") }
-                }
+        ) { Text("Xóa theo bộ lọc") }
+        OutlinedButton(
+            { deleteRequest = DeleteRequest(ProtectedAction.DELETE_ALL, "Xóa toàn bộ dữ liệu?") },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Xóa tất cả") }
+        OutlinedButton({
+            val file = container.csv.writeCompleteExport(container.pilotConfig.load().deviceNumber, records)
+            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, container.csv.shareUri(file))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }, "Chia sẻ lịch sử"))
+        }, enabled = records.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Xuất CSV theo bộ lọc") }
+        records.forEach { record ->
+            Column(Modifier.fillMaxWidth()) {
+                Text("#${record.id} - ${formatTime(record.capturedAt)} - ${record.recordType.name}")
+                Text("Trạng thái gửi: ${record.state.name}")
+                Text("Pin ${record.batteryPercent ?: "?"}% | Sai số ${record.accuracy ?: "?"} m")
+                Text("Đã theo dõi ${formatDuration(record.trackedDurationMillis)}")
+                Text("${record.latitude}, ${record.longitude}")
             }
         }
     }
 
-    preview?.let { imported ->
+    deleteRequest?.let { request ->
         AlertDialog(
-            onDismissRequest = { preview = null },
-            title = { Text("Xem trước cấu hình") },
-            text = { Text("${imported.name}\n${imported.scheme.name.lowercase()}://${imported.host}:${imported.port}\nChu kỳ: ${imported.intervalSeconds} giây\nTLS: ${imported.tlsMode}") },
-            confirmButton = { TextButton({ name = imported.name; host = imported.host; port = imported.port.toString(); scheme = imported.scheme; interval = imported.intervalSeconds.toString(); tlsMode = imported.tlsMode; pin = imported.certificatePin.orEmpty(); preview = null }) { Text("Áp dụng vào form") } },
-            dismissButton = { TextButton({ preview = null }) { Text("Hủy") } },
+            onDismissRequest = { deleteRequest = null },
+            title = { Text("Xác nhận xóa") },
+            text = { Text("${request.label}\nThao tác này không thể hoàn tác.") },
+            confirmButton = {
+                Button({
+                    deleteRequest = null
+                    requirePin(request.action) {
+                        scope.launch {
+                            request.range?.let { container.history.deleteBetween(it.from, it.until) }
+                                ?: container.history.deleteAll()
+                        }
+                    }
+                }) { Text("Tiếp tục") }
+            },
+            dismissButton = {
+                OutlinedButton({ deleteRequest = null }) { Text("Hủy") }
+            },
         )
     }
 }
 
 @Composable
-private fun DiagnosticsScreen(container: AppContainer, modifier: Modifier) {
-    val profiles by container.profiles.observeAll().collectAsStateWithLifecycle(emptyList())
-    val active = profiles.firstOrNull { it.active }
-    val scope = rememberCoroutineScope()
-    var networkResult by remember { mutableStateOf<DiagnosticResult?>(null) }
-    var dataResult by remember { mutableStateOf<DiagnosticResult?>(null) }
-    Column(modifier.padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Chẩn đoán kết nối", style = MaterialTheme.typography.headlineSmall)
-        Text(active?.name ?: "Chưa có profile active")
-        Button(
-            onClick = { active?.let { scope.launch { networkResult = withContext(Dispatchers.IO) { container.connectionTester.testNetwork(it) } } } },
-            enabled = active != null,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Bước 1: Kiểm tra máy chủ") }
-        networkResult?.let { Text(diagnosticText(it)) }
-        Button(
-            onClick = { active?.let { scope.launch { dataResult = withContext(Dispatchers.IO) { container.connectionTester.sendLatest(it, container.deviceId.get(), container.latestLocation) } } } },
-            enabled = active != null && networkResult == DiagnosticResult.ServerReachable,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Bước 2: Gửi GPS thật gần nhất") }
-        dataResult?.let { Text(diagnosticText(it)) }
+private fun SelectionDropdown(
+    label: String,
+    selected: Int?,
+    options: List<Int?>,
+    text: (Int?) -> String,
+    onSelected: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedButton({ expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("$label: ${text(selected)}")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(text(option)) },
+                    onClick = {
+                        expanded = false
+                        onSelected(option)
+                    },
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun StatusRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label); Text(value) }
-}
-
-@Composable
-private fun RefreshOnResume(onResume: () -> Unit) {
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) onResume() }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-}
-
-@Composable
-private fun BatteryButton() {
-    val context = LocalContext.current
-    val manager = context.getSystemService(PowerManager::class.java)
-    if (!manager.isIgnoringBatteryOptimizations(context.packageName)) {
-        OutlinedButton(
-            onClick = { context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))) },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Cho phép chạy ổn định khi khóa màn hình") }
-    }
-}
+private fun StatusRow(label: String, value: String) = Row(
+    Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween,
+) { Text(label); Text(value) }
 
 private fun permissionSnapshot(activity: Activity, fineRequested: Boolean, refresh: Int): PermissionSnapshot {
     refresh.hashCode()
-    val location = activity.getSystemService(LocationManager::class.java).isLocationEnabled
-    val fine = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val fine = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
     return PermissionSnapshot(
-        location,
+        activity.getSystemService(LocationManager::class.java).isLocationEnabled,
         fine,
-        ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED,
-        ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
-        fineRequested && !fine && !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION),
+        ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED,
+        Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED,
+        fineRequested && !fine && !ActivityCompat.shouldShowRequestPermissionRationale(
+            activity,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ),
     )
 }
 
-private fun permissionButtonText(action: PermissionAction) = when (action) {
-    PermissionAction.Ready -> "Bắt đầu theo dõi"
-    PermissionAction.OpenLocationSettings -> "Bật dịch vụ vị trí"
-    PermissionAction.RequestFine -> "Cấp quyền vị trí"
-    PermissionAction.RequestBackground -> "Cho phép vị trí nền"
-    PermissionAction.RequestNotifications -> "Cho phép thông báo"
-    PermissionAction.OpenAppSettings -> "Mở cài đặt ứng dụng"
+private fun pinDialogTitle(action: ProtectedAction): String = when (action) {
+    ProtectedAction.OPEN_SETTINGS -> "Mở khóa Cấu hình"
+    ProtectedAction.STOP_TRACKING -> "Xác nhận dừng theo dõi"
+    ProtectedAction.DELETE_FILTERED, ProtectedAction.DELETE_ALL -> "Xác nhận xóa dữ liệu"
 }
 
-private fun openAppSettings(activity: Activity) = activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${activity.packageName}")))
-private fun formatTime(value: Long) = if (value == 0L) "Chưa có" else DateFormat.getDateTimeInstance().format(Date(value))
+private fun openAppSettings(activity: Activity) = activity.startActivity(
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${activity.packageName}")),
+)
 
-private fun diagnosticText(result: DiagnosticResult) = when (result) {
-    DiagnosticResult.ServerReachable -> "Máy chủ đã phản hồi"
-    DiagnosticResult.DataAccepted -> "Máy chủ đã nhận dữ liệu GPS"
-    DiagnosticResult.RealLocationRequired -> "Chưa có GPS thật. Hãy bắt đầu theo dõi và thử lại."
-    DiagnosticResult.DnsError -> "Không tìm thấy tên máy chủ (DNS)"
-    DiagnosticResult.ConnectionRefused -> "Máy chủ từ chối kết nối"
-    DiagnosticResult.Timeout -> "Kết nối quá thời gian chờ"
-    DiagnosticResult.TlsError -> "Chứng chỉ HTTPS không hợp lệ hoặc không khớp"
-    is DiagnosticResult.HttpError -> "Máy chủ trả lỗi HTTP ${result.code}"
-    is DiagnosticResult.NetworkError -> "Lỗi mạng: ${result.detail}"
+private fun formatTime(value: Long) = if (value == 0L) {
+    "Chưa có"
+} else {
+    DateFormat.getDateTimeInstance().format(Date(value))
 }
 
-private fun buildConfigJson(name: String, host: String, port: String, scheme: Scheme, interval: String, tls: TlsMode, pin: String): String = org.json.JSONObject()
-    .put("version", 1)
-    .put("name", name)
-    .put("host", host)
-    .put("port", port.toIntOrNull() ?: 0)
-    .put("scheme", scheme.name.lowercase())
-    .put("intervalSeconds", interval.toIntOrNull() ?: 0)
-    .put("tlsMode", when (tls) { TlsMode.SYSTEM -> "system"; TlsMode.CUSTOM_CA -> "customCa"; TlsMode.PINNING -> "pinning" })
-    .apply { if (pin.isNotBlank()) put("certificatePin", pin) }
-    .toString()
+private fun formatDuration(value: Long): String {
+    val minutes = value.coerceAtLeast(0) / 60_000
+    return "${minutes / 1_440}d ${minutes / 60 % 24}h ${minutes % 60}m"
+}
