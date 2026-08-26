@@ -98,6 +98,7 @@ dependencies {
     implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.security)
+    implementation(libs.play.services.location)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
@@ -105,4 +106,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.room.testing)
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

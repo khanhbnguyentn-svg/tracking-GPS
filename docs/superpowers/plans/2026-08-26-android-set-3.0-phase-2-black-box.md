@@ -56,7 +56,7 @@ class TrackingDatabaseFactory(
 ) { fun open(): TrackingDatabase }
 ```
 
-- [ ] **Step 1: Write the failing test.**
+- [x] **Step 1: Write the failing test.**
 
 ```kotlin
 @Test fun opensWithSqlCipherWalAndForeignKeys() {
@@ -66,10 +66,10 @@ class TrackingDatabaseFactory(
 }
 ```
 
-- [ ] **Step 2: Run `./gradlew.bat connectedDebugAndroidTest --tests "com.internal.tracker.tracking.database.TrackingDatabaseIntegrationTest"`.** Expected: FAIL because factory/schema are absent.
-- [ ] **Step 3: Add `play-services-location` version `21.3.0`, `implementation(libs.play.services.location)`, and Room schema output to `schemas/`.**
-- [ ] **Step 4: Implement factory using the Phase 1 passphrase, SQLCipher factory, database name `tracking-set.db`, WAL, foreign keys, and `auto_vacuum=INCREMENTAL` before first schema creation.** Never add destructive migration.
-- [ ] **Step 5: Re-run Step 2.** Expected: PASS.
+- [x] **Step 2: Run `./gradlew.bat connectedDebugAndroidTest --tests "com.internal.tracker.tracking.database.TrackingDatabaseIntegrationTest"`.** Expected: FAIL because factory/schema are absent.
+- [x] **Step 3: Add `play-services-location` version `21.3.0`, `implementation(libs.play.services.location)`, and Room schema output to `schemas/`.**
+- [x] **Step 4: Implement factory using the Phase 1 passphrase, SQLCipher factory, database name `tracking-set.db`, WAL, foreign keys, and `auto_vacuum=INCREMENTAL` before first schema creation.** Never add destructive migration.
+- [x] **Step 5: Re-run Step 2.** Expected: PASS.
 - [ ] **Step 6: Commit exact files with message `feat: bootstrap encrypted tracking database`.**
 
 ## Task 2: Define raw schema, ten-second gate, and atomic persistence
