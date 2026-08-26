@@ -1,88 +1,66 @@
-# Checklist máy thật Android 14–16
+# Checklist thiết bị thật Android 14-16
 
-Ghi model máy, hãng, phiên bản Android, phiên bản app, Device ID, profile và người test.
+Checklist này chỉ áp dụng cho Android 2.1 Periodic Email Pilot. Ghi lại model, hãng, phiên bản Android, phiên bản app, số thiết bị, Device ID, người kiểm thử và thời gian kiểm thử.
 
-## Cài đặt và quyền
+## 1. Cài đặt và nâng cấp
 
-- [ ] Trên máy đang có `2.0.3 (5)`, cài đè `tracking-gps-2.1.0.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
-- [ ] Android hiển thị luồng **Cập nhật**, không báo xung đột chữ ký; app sau cài đặt là `2.1.0 (6)`.
-- [ ] Room History, số thiết bị, Gmail/email nhận, chu kỳ và PIN còn nguyên sau cập nhật.
-- [ ] Mở Settings bằng PIN tầng 2, bấm `Lưu và kiểm tra`; Gmail đăng nhập thành công trên bản 2.1.0.
-- [ ] Trạng thái tracking còn nguyên; sau khi mở app, foreground notification và kỳ báo cáo tiếp theo được reconcile.
-- [ ] Nếu tracking đang bật trước cập nhật, `MY_PACKAGE_REPLACED` tự phục hồi foreground service mà không cần reboot; nếu broadcast bị trì hoãn, mở app phục hồi service nhưng không thay lịch báo cáo.
+- [ ] Cài đè signed APK `tracking-gps-2.1.0.apk` bằng Package Installer hoặc `adb install -r`; không uninstall và không dùng `-d`.
+- [ ] Android hiển thị luồng cập nhật, không báo xung đột chữ ký; app sau cài đặt là `2.1.0 (6)`.
+- [ ] Room History, số thiết bị, Gmail gửi, email nhận, chu kỳ, PIN và tracking state còn nguyên.
 - [ ] Nếu gặp signature mismatch, dừng kiểm thử và bảo toàn package data; không gỡ app để thử lại.
-- [ ] Import file JSON dùng chung; xem trước đúng host, port, chu kỳ, scheme và TLS.
-- [ ] Lưu/chuyển profile trên máy; không có Device ID trong file JSON.
-- [ ] Quyền được hỏi theo thứ tự: vị trí chính xác, vị trí nền, thông báo.
-- [ ] Khi từ chối vĩnh viễn, nút mở đúng trang App Settings; khi GPS tắt, nút mở Location Settings.
-- [ ] Nút tối ưu pin mở đúng trang hệ thống; ghi lại yêu cầu riêng của Samsung/Xiaomi/Oppo/Vivo nếu có.
+- [ ] Nếu tracking đang bật trước cập nhật, `MY_PACKAGE_REPLACED` hoặc lần mở app kế tiếp phục hồi foreground service mà không reset thời điểm bắt đầu.
 
-## Theo dõi
+## 2. Cấu hình và quyền
 
-- [ ] Bắt đầu tracking khi app đang mở; notification foreground xuất hiện và giữ ổn định.
-- [ ] Traccar nhận đúng Device ID và vị trí thật, không có điểm `0,0`.
-- [ ] Khóa màn hình 30 phút: vị trí vẫn cập nhật theo chu kỳ cấu hình.
-- [ ] Vuốt app khỏi recent apps: foreground tracking vẫn chạy hoặc app báo rõ nếu hãng dừng service.
-- [ ] Nút Stop trong app và notification dừng tracking; app không tự khởi động lại bằng WorkManager.
-- [ ] Khởi động lại điện thoại: tracking đang bật tự phục hồi foreground service và GPS sau khi user profile mở khóa; không cần bấm Start lại.
-- [ ] Khi tracking vẫn bật và xe đã dừng trên 2 phút, `dumpsys location` vẫn hiển thị request `HIGH_ACCURACY` mỗi 10 giây cho `com.internal.tracker`.
-- [ ] Di chuyển lại sau khi dừng trên 2 phút: app tạo `START` mới mà không cần mở lại app.
+- [ ] Mở Settings bằng PIN quản trị và chạy `Lưu và kiểm tra`; Gmail SMTP đăng nhập thành công.
+- [ ] Cấp vị trí chính xác, vị trí nền và notification theo luồng Android.
+- [ ] Activity Recognition là tùy chọn; từ chối quyền này không chặn GPS tracking.
+- [ ] Nút quyền thiết bị mở đúng App Settings khi quyền bị từ chối vĩnh viễn.
+- [ ] Khi GPS tắt, app mở đúng Location Settings và hiển thị lỗi có thể xử lý.
+- [ ] Tắt tối ưu pin theo chính sách của model Samsung/Xiaomi/Oppo/Vivo được triển khai.
 
-## Mạng, retry và TLS
+## 3. Foreground tracking và hành trình
 
-- [ ] Tắt Wi-Fi/mobile data ít nhất ba chu kỳ: số điểm chờ tăng, app không mất dữ liệu.
-- [ ] Bật mạng: hàng đợi giảm về 0, thứ tự/thời gian điểm trên Traccar hợp lý.
-- [ ] DNS sai, port đóng, timeout và HTTP lỗi cho thông báo chẩn đoán khác nhau.
-- [ ] HTTPS CA hệ thống hoạt động; chứng chỉ sai hostname/hết hạn bị từ chối.
-- [ ] Custom CA đúng hoạt động; file CA sai bị từ chối.
-- [ ] Pin đúng hoạt động; pin sai bị từ chối.
-- [ ] HTTP chỉ được thử trong mạng/VPN đã duyệt và app hiển thị cảnh báo.
+- [ ] Bật tracking; foreground notification xuất hiện và duy trì ổn định.
+- [ ] Khóa màn hình 30 phút; callback GPS vẫn tiếp tục theo cadence đã thiết kế.
+- [ ] Vuốt app khỏi recent apps; foreground tracking tiếp tục hoặc app báo rõ nếu firmware dừng service.
+- [ ] Reboot khi tracking đang bật; sau khi mở khóa user profile, foreground service và GPS tự phục hồi mà không cần bấm Start.
+- [ ] `dumpsys location` hiển thị request `HIGH_ACCURACY` khoảng 10 giây cho `com.internal.tracker` khi tracking hoạt động.
+- [ ] Khi xe chạy, app lưu `PERIODIC` khoảng mỗi 2 phút.
+- [ ] Dừng dưới 2 phút tạo `TEMP_STOP`; dừng từ 2 phút trở lên nâng cùng record thành `STOP`.
+- [ ] Di chuyển lại tạo `START` mới mà không cần mở lại app.
+- [ ] Stop trong app hoặc notification dừng tracking; app không tự bật lại khi trạng thái đã được lưu là tắt.
 
-## Server và cảnh báo
+## 4. Email định kỳ và retry
 
-- [ ] Thiết bị mới vào group chờ, PIC đối chiếu ID rồi đổi tên/chuyển group.
-- [ ] Ngắt mạng: PIC nhận cảnh báo sau 5 phút và escalation/lặp ở phút 10.
-- [ ] Khôi phục mạng: điểm chờ được gửi và PIC thấy dữ liệu mới.
-- [ ] Tạm tắt cảnh báo cho máy test, đặt hạn ngắn; hết hạn notification được gắn lại tự động.
+- [ ] Mỗi kỳ 6h/12h/24h tạo tối đa một email logic với đúng Message ID và CSV attachment.
+- [ ] CSV chứa đúng số thiết bị, Device ID, thời gian, tọa độ, accuracy, pin, tracked duration, delivery state và record type.
+- [ ] `TEMP_STOP` chưa hoàn tất không xuất hiện trong email.
+- [ ] Tắt mạng qua ít nhất ba kỳ; dữ liệu vẫn nằm trong Room và delivery chuyển sang retry thay vì bị mất.
+- [ ] Bật mạng; kỳ kế tiếp gửi backlog đúng thứ tự và không đánh dấu `SENT` trước khi SMTP thành công.
+- [ ] Gmail authentication failure hiển thị lỗi công khai an toàn; không lộ App Password, PIN hoặc stack trace.
+- [ ] Báo cáo đã gửi không bị gửi lại ngoài trường hợp retry/resend có Message ID được kiểm soát.
 
-Kết quả chỉ đạt khi thử ít nhất một máy Android 14 và các model hãng thực tế sẽ triển khai. Các lỗi do chính sách pin của hãng phải được ghi thành hướng dẫn riêng theo model.
+## 5. Tracking integrity diagnostics
 
-## Tracking integrity diagnostics - signed build 2.1.0
+- [ ] Tắt Location ít nhất 40 giây khi tracking đang bật; service vẫn foreground và chỉ tạo một incident GPS gap.
+- [ ] Khi có mạng, chỉ một email `GPS_GAP_OPENED` được gửi; không lặp theo health check 10 giây.
+- [ ] Bật lại Location; email `GPS_GAP_RECOVERED` dùng cùng incident ID và chứa duration cùng evidence trước/sau.
+- [ ] Khi mất mạng, lỗi SMTP không dừng tracking; diagnostic chưa gửi xuất hiện trong attachment của report định kỳ kế tiếp.
+- [ ] Reboot/update chỉ tạo tối đa một gap suy luận cho cùng sự kiện và không reset `startedAt`.
+- [ ] Diagnostics không xóa, sửa, trì hoãn hoặc tạo thêm route record giả.
+- [ ] Status, History và Settings không hiển thị màn diagnostics nội bộ mới.
 
-Chỉ thực hiện các bước sau với APK release đã ký đúng certificate. Không cài debug APK lên máy đang chứa dữ liệu vận hành.
+## 6. History, export và xóa dữ liệu
 
-### GPS gap khi có mạng
+- [ ] Lọc theo năm/tháng trả đúng phạm vi và xuất đúng CSV.
+- [ ] Xóa theo bộ lọc chỉ xóa phạm vi đang chọn sau bước xác nhận và PIN.
+- [ ] Xóa tất cả chỉ thực hiện sau xác nhận rõ phạm vi và PIN.
+- [ ] Dữ liệu cũ hơn thời hạn lưu giữ được cleanup mà không ảnh hưởng record mới hoặc delivery đang retry.
 
-- [ ] Bật tracking, xác nhận foreground service đang chạy và ghi lại app version, incident test time và service state.
-- [ ] Tắt Location ít nhất 40 giây; service phải tiếp tục foreground.
-- [ ] Xác nhận chỉ có một email `GPS_GAP_OPENED`, không phát sinh email lặp lại theo mỗi health check 10 giây.
-- [ ] Bật lại Location; email `GPS_GAP_RECOVERED` phải dùng cùng incident ID và có duration cùng evidence trước/sau.
-- [ ] Không lưu credential hoặc tọa độ đầy đủ trong log test; chỉ lưu incident ID, timestamp, count, service state và subject email đã che thông tin.
+## 7. Kết quả chấp nhận
 
-### Mất mạng và fallback định kỳ
-
-- [ ] Tắt mạng trước khi tạo một GPS gap khác; lỗi SMTP không được dừng tracking hoặc foreground service.
-- [ ] Bật lại mạng rồi chờ/trigger kỳ report tiếp theo.
-- [ ] Email định kỳ phải chứa `diagnostic-summary` và `diagnostic-samples`; incident chưa gửi tức thời phải nằm trong attachment.
-- [ ] Email không chứa Gmail App Password, PIN hoặc stack trace.
-
-### Reboot, update và dữ liệu hành trình
-
-- [ ] Khi tracking đang bật, reboot máy, mở khóa user profile một lần và không bấm Start lại.
-- [ ] Foreground service và request `HIGH_ACCURACY` 10 giây phải tự phục hồi; gap suy luận sau reboot chỉ được tạo một lần.
-- [ ] Cài đè signed APK bằng `adb install -r`; `MY_PACKAGE_REPLACED` phải phục hồi tracking mà không reset `startedAt`.
-- [ ] Khi xe chạy, route vẫn lưu `PERIODIC` mỗi 2 phút; diagnostics không được xóa, sửa, trì hoãn hoặc thêm route record giả.
-- [ ] Một `TEMP_STOP` dưới 2 phút và một `STOP` từ 2 phút trở lên theo đúng thứ tự không được tạo anomaly giả.
-- [ ] Status, History và Settings không hiển thị màn hình diagnostics mới.
-
-### Kết quả Samsung SM_A566B - 2026-08-17
-
-- [x] Update in-place 2.0.3 (5) lên 2.1.0 (6) bằng `adb install -r`; package data không bị uninstall.
-- [x] `MY_PACKAGE_REPLACED` phục hồi foreground service và GPS HIGH_ACCURACY 10 giây.
-- [x] Location off 45 giây: service vẫn foreground; Location và request GPS khôi phục sau khi bật lại.
-- [x] Reboot khi tracking bật: user 0 trở lại `RUNNING_UNLOCKED`; service/GPS tự phục hồi, không mở app và không bấm Start.
-- [x] Network-loss gap: mobile data và Location được khôi phục; foreground tracking không dừng.
-- [x] Status sau update hiển thị `Đang theo dõi` và 2,100 record; backup route ngày 17 tiếp tục được cập nhật.
-- [ ] Admin xác nhận email OPENED/RECOVERED cùng incident ID và hai diagnostics attachment trong report đã force.
-- [ ] User xác nhận Settings, Gmail credential và PIN còn nguyên bằng `Lưu và kiểm tra`.
-- [ ] Chạy xe để xác nhận PERIODIC 2 phút và một chuỗi TEMP_STOP/STOP bình thường không tạo anomaly giả.
+- [ ] Chạy toàn bộ checklist trên ít nhất một máy Android 14 và từng nhóm model thực tế sẽ triển khai.
+- [ ] Ghi rõ mọi hạn chế firmware/battery policy theo model.
+- [ ] Admin xác nhận email định kỳ, OPENED/RECOVERED và diagnostics attachments bằng dữ liệu đã che thông tin nhạy cảm.
+- [ ] Không cài debug APK lên thiết bị đang chứa dữ liệu vận hành.

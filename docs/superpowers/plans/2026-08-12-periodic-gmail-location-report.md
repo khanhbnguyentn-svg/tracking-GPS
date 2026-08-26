@@ -501,7 +501,7 @@ git commit -m "docs: hand over periodic Gmail pilot"
 
 - [ ] **Step 1: Review the full branch diff against the approved design**
 
-Run: `git diff feature/cloudflare-quick-tunnel-pilot...HEAD --stat` and inspect every changed file for data loss, secret exposure, scheduling drift, and Android 10 API compatibility.
+Run: `git diff origin/feature/periodic-email-reports...HEAD --stat` and inspect every changed file for data loss, secret exposure, scheduling drift, and Android 10 API compatibility.
 
 - [ ] **Step 2: Run final verification after any review fixes**
 
@@ -509,7 +509,7 @@ Run: `./gradlew.bat clean testDebugUnitTest lintDebug assembleDebug --no-daemon 
 
 - [ ] **Step 3: Verify repository state and summarize commits**
 
-Run: `git status --short` and `git log --oneline feature/cloudflare-quick-tunnel-pilot..HEAD`.
+Run: `git status --short` and `git log --oneline origin/feature/periodic-email-reports..HEAD`.
 
 - [ ] **Step 4: Push the feature branch after user-approved network action**
 
