@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Android SET 3.0</string>
-    <string name="phase_status">Phase 1 platform foundation</string>
+    <string name="app_name">Android SET 3.1</string>
+    <string name="phase_status">GPS tracking is ready to set up</string>
+    <string name="tracking_notification_channel">GPS tracking</string>
+    <string name="tracking_notification_title">SET đang theo dõi GPS</string>
+    <string name="tracking_status_title">Trạng thái theo dõi</string>
+    <string name="tracking_status_tracking">Đang theo dõi GPS</string>
+    <string name="tracking_status_provider">Provider: Fused high accuracy</string>
+    <string name="tracking_status_raw">Raw GPS: đang ghi cục bộ</string>
+    <string name="tracking_status_version">Phiên bản 3.1.0 (8)</string>
 </resources>

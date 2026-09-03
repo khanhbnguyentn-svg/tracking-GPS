@@ -9,8 +9,10 @@ import androidx.room.RoomDatabase
         BootSessionEntity::class,
         SequenceStateEntity::class,
         RawGpsSampleEntity::class,
+        MovementEventEntity::class,
+        TrackingIncidentEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class TrackingDatabase : RoomDatabase() {

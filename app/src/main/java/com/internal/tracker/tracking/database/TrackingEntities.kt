@@ -45,3 +45,43 @@ data class RawGpsSampleEntity(
     val bootSessionId: String,
     val kind: String,
 )
+
+@Entity(
+    tableName = "movement_event",
+    foreignKeys = [
+        ForeignKey(
+            entity = RawGpsSampleEntity::class,
+            parentColumns = ["sequenceNumber"],
+            childColumns = ["firstSourceSequenceNumber"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = RawGpsSampleEntity::class,
+            parentColumns = ["sequenceNumber"],
+            childColumns = ["confirmingSourceSequenceNumber"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(value = ["effectiveAtUtcMillis"]),
+        Index(value = ["firstSourceSequenceNumber"]),
+        Index(value = ["confirmingSourceSequenceNumber"]),
+    ],
+)
+data class MovementEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val type: String,
+    val effectiveAtUtcMillis: Long,
+    val confirmedAtUtcMillis: Long,
+    val firstSourceSequenceNumber: Long,
+    val confirmingSourceSequenceNumber: Long,
+    val algorithmVersion: Int,
+)
+
+@Entity(tableName = "tracking_incident", indices = [Index(value = ["openedAtUtcMillis"])])
+data class TrackingIncidentEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val type: String,
+    val openedAtUtcMillis: Long,
+    val closedAtUtcMillis: Long?,
+)

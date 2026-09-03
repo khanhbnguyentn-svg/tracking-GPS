@@ -42,8 +42,8 @@ android {
         applicationId = "com.internal.tracker"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "3.0.0"
+        versionCode = 8
+        versionName = "3.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -81,6 +81,10 @@ android {
             signingConfig = stableReleaseSigning
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+
+    sourceSets {
+        getByName("androidTest").assets.srcDir("schemas")
     }
 }
 

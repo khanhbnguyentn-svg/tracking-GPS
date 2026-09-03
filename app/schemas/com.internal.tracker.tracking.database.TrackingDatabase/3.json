@@ -1,0 +1,390 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "101e386919c7177992281a02b3145335",
+    "entities": [
+      {
+        "tableName": "tracking_database_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `createdAtUtcMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtUtcMillis",
+            "columnName": "createdAtUtcMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "boot_session",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `reason` TEXT NOT NULL, `startedAtUtcMillis` INTEGER NOT NULL, `startedAtElapsedRealtimeNanos` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtUtcMillis",
+            "columnName": "startedAtUtcMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtElapsedRealtimeNanos",
+            "columnName": "startedAtElapsedRealtimeNanos",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "sequence_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `nextSequenceNumber` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextSequenceNumber",
+            "columnName": "nextSequenceNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "gps_raw_sample",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sequenceNumber` INTEGER NOT NULL, `capturedUtcMillis` INTEGER NOT NULL, `capturedOffsetMinutes` INTEGER NOT NULL, `elapsedRealtimeNanos` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `altitudeMeters` REAL, `horizontalAccuracyMeters` REAL, `verticalAccuracyMeters` REAL, `speedMetersPerSecond` REAL, `speedAccuracyMetersPerSecond` REAL, `bearingDegrees` REAL, `bearingAccuracyDegrees` REAL, `provider` TEXT, `isMock` INTEGER NOT NULL, `bootSessionId` TEXT NOT NULL, `kind` TEXT NOT NULL, PRIMARY KEY(`sequenceNumber`), FOREIGN KEY(`bootSessionId`) REFERENCES `boot_session`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "sequenceNumber",
+            "columnName": "sequenceNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedUtcMillis",
+            "columnName": "capturedUtcMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedOffsetMinutes",
+            "columnName": "capturedOffsetMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elapsedRealtimeNanos",
+            "columnName": "elapsedRealtimeNanos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "altitudeMeters",
+            "columnName": "altitudeMeters",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "horizontalAccuracyMeters",
+            "columnName": "horizontalAccuracyMeters",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "verticalAccuracyMeters",
+            "columnName": "verticalAccuracyMeters",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "speedMetersPerSecond",
+            "columnName": "speedMetersPerSecond",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "speedAccuracyMetersPerSecond",
+            "columnName": "speedAccuracyMetersPerSecond",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bearingDegrees",
+            "columnName": "bearingDegrees",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bearingAccuracyDegrees",
+            "columnName": "bearingAccuracyDegrees",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isMock",
+            "columnName": "isMock",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bootSessionId",
+            "columnName": "bootSessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sequenceNumber"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_gps_raw_sample_capturedUtcMillis",
+            "unique": false,
+            "columnNames": [
+              "capturedUtcMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gps_raw_sample_capturedUtcMillis` ON `${TABLE_NAME}` (`capturedUtcMillis`)"
+          },
+          {
+            "name": "index_gps_raw_sample_bootSessionId_elapsedRealtimeNanos",
+            "unique": false,
+            "columnNames": [
+              "bootSessionId",
+              "elapsedRealtimeNanos"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_gps_raw_sample_bootSessionId_elapsedRealtimeNanos` ON `${TABLE_NAME}` (`bootSessionId`, `elapsedRealtimeNanos`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "boot_session",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "bootSessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "movement_event",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `effectiveAtUtcMillis` INTEGER NOT NULL, `confirmedAtUtcMillis` INTEGER NOT NULL, `firstSourceSequenceNumber` INTEGER NOT NULL, `confirmingSourceSequenceNumber` INTEGER NOT NULL, `algorithmVersion` INTEGER NOT NULL, FOREIGN KEY(`firstSourceSequenceNumber`) REFERENCES `gps_raw_sample`(`sequenceNumber`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`confirmingSourceSequenceNumber`) REFERENCES `gps_raw_sample`(`sequenceNumber`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectiveAtUtcMillis",
+            "columnName": "effectiveAtUtcMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confirmedAtUtcMillis",
+            "columnName": "confirmedAtUtcMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSourceSequenceNumber",
+            "columnName": "firstSourceSequenceNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confirmingSourceSequenceNumber",
+            "columnName": "confirmingSourceSequenceNumber",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "algorithmVersion",
+            "columnName": "algorithmVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_movement_event_effectiveAtUtcMillis",
+            "unique": false,
+            "columnNames": [
+              "effectiveAtUtcMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_movement_event_effectiveAtUtcMillis` ON `${TABLE_NAME}` (`effectiveAtUtcMillis`)"
+          },
+          {
+            "name": "index_movement_event_firstSourceSequenceNumber",
+            "unique": false,
+            "columnNames": [
+              "firstSourceSequenceNumber"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_movement_event_firstSourceSequenceNumber` ON `${TABLE_NAME}` (`firstSourceSequenceNumber`)"
+          },
+          {
+            "name": "index_movement_event_confirmingSourceSequenceNumber",
+            "unique": false,
+            "columnNames": [
+              "confirmingSourceSequenceNumber"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_movement_event_confirmingSourceSequenceNumber` ON `${TABLE_NAME}` (`confirmingSourceSequenceNumber`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "gps_raw_sample",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "firstSourceSequenceNumber"
+            ],
+            "referencedColumns": [
+              "sequenceNumber"
+            ]
+          },
+          {
+            "table": "gps_raw_sample",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "confirmingSourceSequenceNumber"
+            ],
+            "referencedColumns": [
+              "sequenceNumber"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "tracking_incident",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `openedAtUtcMillis` INTEGER NOT NULL, `closedAtUtcMillis` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "openedAtUtcMillis",
+            "columnName": "openedAtUtcMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "closedAtUtcMillis",
+            "columnName": "closedAtUtcMillis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_tracking_incident_openedAtUtcMillis",
+            "unique": false,
+            "columnNames": [
+              "openedAtUtcMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tracking_incident_openedAtUtcMillis` ON `${TABLE_NAME}` (`openedAtUtcMillis`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '101e386919c7177992281a02b3145335')"
+    ]
+  }
+}

@@ -30,8 +30,8 @@ class ProjectConfigTest {
 
         assertTrue(appBuild.contains("minSdk = 26"))
         assertTrue(appBuild.contains("targetSdk = 36"))
-        assertTrue(appBuild.contains("versionCode = 7"))
-        assertTrue(appBuild.contains("versionName = \"3.0.0\""))
+        assertTrue(appBuild.contains("versionCode = 8"))
+        assertTrue(appBuild.contains("versionName = \"3.1.0\""))
         assertTrue(catalog.contains("room = \"2.8.4\""))
         assertTrue(catalog.contains("sqlcipher = \"4.17.0\""))
         assertTrue(catalog.contains("sqlite = \"2.7.0\""))

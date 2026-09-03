@@ -31,6 +31,12 @@ fun SetHomeShell() {
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(text = stringResource(R.string.phase_status))
+                Spacer(Modifier.height(20.dp))
+                Text(text = stringResource(R.string.tracking_status_title), style = MaterialTheme.typography.titleLarge)
+                Text(text = stringResource(R.string.tracking_status_tracking))
+                Text(text = stringResource(R.string.tracking_status_provider))
+                Text(text = stringResource(R.string.tracking_status_raw))
+                Text(text = stringResource(R.string.tracking_status_version))
             }
         }
     }

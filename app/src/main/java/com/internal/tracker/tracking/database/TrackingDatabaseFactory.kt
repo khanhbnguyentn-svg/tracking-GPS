@@ -26,6 +26,7 @@ class TrackingDatabaseFactory(
                     ConfiguringOpenHelperFactory(factoryProvider.create(passphrase)),
                 )
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+                .addMigrations(TrackingMigrations.MIGRATION_2_3)
                 .build()
         } finally {
             passphrase.fill(0)
